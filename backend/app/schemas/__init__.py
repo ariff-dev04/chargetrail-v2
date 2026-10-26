@@ -7,6 +7,13 @@ from app.schemas.community import (
     ReviewRead,
     StationModerationUpdate,
 )
+from app.schemas.routing import (
+    ChargingStopRecommendation,
+    LatLngPoint,
+    PlaceSuggestion,
+    RoutePlanRequest,
+    RoutePlanResponse,
+)
 from app.schemas.station import (
     AccessStep,
     PlugInfo,
@@ -34,11 +41,16 @@ from app.schemas.vehicle import (
 __all__ = [
     "AccessStep",
     "BookmarkToggleResponse",
+    "ChargingStopRecommendation",
+    "LatLngPoint",
     "MicroSurveyConsensusRead",
     "MicroSurveyCreate",
+    "PlaceSuggestion",
     "PlugInfo",
     "ReviewCreate",
     "ReviewRead",
+    "RoutePlanRequest",
+    "RoutePlanResponse",
     "SeedResponse",
     "StationBase",
     "StationCreate",

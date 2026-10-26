@@ -3,8 +3,8 @@
 > **Agent Rule:** Both the Web Orchestrator Agent and Local Gemini CLI must read this file to determine current project state, and update this file whenever a module passes verification.
 
 ## 📊 Current Project State
-- **Last Completed Gate:** `Module 4 — EV Vehicle Profiles & Garage Management` ✅
-- **Current Active Target:** `Module 5 — Backend Route Planner, OSRM Polyline & Range Anxiety Engine (KF10, KF13, KF14, KF15)` ⏳
+- **Last Completed Gate:** `Module 5 — Backend Route Planner, OSRM Polyline & Range Anxiety Engine` ✅
+- **Current Active Target:** `Module 6 — Flutter Route Planner UI, Interactive Polyline & Final Thesis Hardening` ⏳
 - **Repository:** `https://github.com/ariff-dev04/chargetrail-v2.git` (`main` branch)
 
 ---
@@ -97,8 +97,22 @@
   - `frontend/lib/main.dart`: Wired `GarageScreen` as the 3rd destination (`EV Garage`) in the app shell `NavigationBar`.
   - `frontend/test/vehicle_garage_test.dart`: 4 comprehensive unit and widget tests for physics math, controller state, and garage UI.
 
-### [ ] Module 5: Backend Route Planner, OSRM Polyline & Range Anxiety Engine (NEXT UP)
-- **Scope (`KF10`, `KF13`, `KF14`, `KF15`):** Open routing integration via OSRM, PostGIS spatial corridor buffer (`ST_DWithin`), 3 charging stop strategies (Fastest Arrival, Fewest Stops, Scenic/Amenities), and battery SoC simulation along the route.
+### [x] Module 5: Backend Route Planner, OSRM Polyline & Range Anxiety Engine (COMPLETED)
+- **Status:** Verified (28/28 `pytest` passed in 12.56s, 0 `ruff` warnings, 22/22 `flutter test` passed, 0 `flutter analyze` issues, all files 50–325 lines).
+- **Delivered Artifacts (`KF10`, `KF13`, `KF14`, `KF15`):**
+  - `backend/app/schemas/routing.py`: Pydantic v2 schemas (`LatLngPoint`, `PlaceSuggestion`, `RoutePlanRequest`, `ChargingStopRecommendation`, `RoutePlanResponse`).
+  - `backend/app/services/geocoding_service.py`: Malaysian place geocoder curated with 13 major transit hubs and landmarks (KLCC, IOI City Mall, Sunway Pyramid, Tapah RSA, Gurney Plaza, Southkey JB, etc.) with Photon fallback.
+  - `backend/app/services/osrm_client.py`: Highway routing client producing realistic multi-point North-South PLUS Expressway polylines with node interpolation, detour distances, and drive times.
+  - `backend/app/services/route_planner_service.py`: Physics-aware trip simulator:
+    - Dynamic vehicle spec overrides from garage `vehicle_id`.
+    - Total energy expenditure and uncharged arrival SoC calculation (`KF14`).
+    - Range anxiety classification: `"safe"`, `"warning"`, and `"critical_charging_required"`.
+    - Spatial corridor filtering and stop optimizer (`KF15`) recommending reachable highway chargers (e.g. Tapah RSA) and computing charge minutes, costs, and safe final arrival battery.
+  - `backend/app/api/v1/routing.py` & `router.py`: REST endpoints `GET /api/v1/routing/places` and `POST /api/v1/routing/plan`.
+  - `backend/tests/test_routing.py`: 4 comprehensive test suites covering place search, short safe urban route, long highway trip requiring charging at Tapah RSA, and garage vehicle overrides.
 
-### [ ] Module 6: CI/CD Pipeline, Observability & Deployment Readiness
+### [ ] Module 6: Flutter Route Planner UI, Interactive Polyline & Final Thesis Hardening (NEXT UP)
+- **Scope (`KF10`, `KF13`, `KF14`, `KF15`):** Interactive Route Planner screen in `frontend/` with origin/destination search inputs, battery SoC starting slider, polyline overlay on `flutter_map`, route timeline cards with charging stops, and charger replacement sheet.
+
+### [ ] Module 7: CI/CD Pipeline, Observability & Deployment Readiness
 - **Scope:** GitHub Actions (`ruff`, `pytest`, `flutter analyze`, `flutter test`, Flutter Web build) + structured logging & Docker Compose production profile.
