@@ -3,8 +3,8 @@
 > **Agent Rule:** Both the Web Orchestrator Agent and Local Gemini CLI must read this file to determine current project state, and update this file whenever a module passes verification.
 
 ## 📊 Current Project State
-- **Last Completed Gate:** `Module 1A — Backend Station Spatial Domain, Filtering & REST API` ✅
-- **Current Active Target:** `Module 1B — Flutter App Shell, Offline Cache & OpenStreetMap Discovery` ⏳
+- **Last Completed Gate:** `Module 1B — Flutter App Shell, Offline Cache & OpenStreetMap Discovery` ✅
+- **Current Active Target:** `Module 2 — Authentication, Community Moderation & Micro-Surveys (Backend + Flutter)` ⏳
 - **Repository:** `https://github.com/ariff-dev04/chargetrail-v2.git` (`main` branch)
 
 ---
@@ -29,8 +29,19 @@
   - `backend/app/api/v1/stations.py` & `backend/app/api/v1/router.py`: REST endpoints `GET /api/v1/stations`, `GET /api/v1/stations/{id}`, `POST /api/v1/stations/seed-sample`.
   - `backend/tests/test_stations.py`: Comprehensive test suite verifying seeding idempotency, bounding box queries, proximity searches, connector/power/amenity/24h filters, access steps, and 404 handling.
 
-### [ ] Module 1B: Flutter App Shell, Offline Cache & OpenStreetMap Discovery (NEXT UP)
-- **Scope:** Initialize `app/` with Flutter 3.x, Riverpod, GoRouter, Dio failover client, Drift local SQLite cache, and `flutter_map` viewport station pins.
+### [x] Module 1B: Flutter App Shell, Offline Cache & OpenStreetMap Discovery (COMPLETED)
+- **Status:** Verified (9/9 `flutter test` passed, 0 `flutter analyze` issues, all files < 350 lines).
+- **Delivered Artifacts (`KF03`, `KF04`, `KF05`):**
+  - `frontend/lib/core/theme/app_theme.dart`: Emerald/teal Material 3 eco-mobility light & dark themes.
+  - `frontend/lib/features/stations/domain/station_model.dart`: Immutable `ChargingStation`, `PlugInfo`, `AccessStep`, and `StationFilter` domain models with JSON serialization and pure filter matching.
+  - `frontend/lib/features/stations/data/station_local_cache.dart`: SharedPreferences async non-blocking offline cache with 6 realistic Malaysian baseline stations.
+  - `frontend/lib/features/stations/data/station_repository.dart`: Dio repository fetching `/api/v1/stations` with automatic failover to offline cache.
+  - `frontend/lib/features/stations/presentation/station_controller.dart`: Riverpod `StationNotifier` managing station search, multi-criterion filter toggles, selection, and offline mode.
+  - `frontend/lib/features/stations/presentation/widgets/station_filter_bar.dart`: Modular search input and horizontal filter chips (`CCS2`, `Type 2`, `CHAdeMO`, `120kW+ Fast`, `24 Hours`, `Dining`, and `Reset`).
+  - `frontend/lib/features/stations/presentation/widgets/station_detail_sheet.dart`: Modular bottom sheet displaying tariff card, parking level badge ("Basement B1, Pillar B12"), plug breakdown, and step-by-step "How to Access Charger" guide.
+  - `frontend/lib/features/stations/presentation/map_discovery_screen.dart`: `flutter_map` OpenStreetMap discovery view with custom speed-coded pins, filter bar overlay, offline banner, and quick preview card.
+  - `frontend/lib/main.dart`: Root `ChargeTrailApp` with `ProviderScope`, Material 3 theme, and 3-tab `AppShell`.
+  - `frontend/test/stations_discovery_test.dart` & `frontend/test/widget_test.dart`: 9 comprehensive unit and widget tests covering models, filtering, cache, filter bar, detail sheet, and navigation shell.
 
 ### [ ] Module 2: Station Details UI, Filter Sheet & Step-by-Step Access Guide
 - **Scope (`KF04`, `KF05`):** Modular detail screen, plug availability badges, parking level/fee cards, "How to Access" visual steps, and filter modal sheet.
