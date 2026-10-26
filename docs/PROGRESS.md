@@ -3,8 +3,8 @@
 > **Agent Rule:** Both the Web Orchestrator Agent and Local Gemini CLI must read this file to determine current project state, and update this file whenever a module passes verification.
 
 ## 📊 Current Project State
-- **Last Completed Gate:** `Module 3 — Community Contributions, Admin Moderation & Survei Mikro Consensus Engine` ✅
-- **Current Active Target:** `Module 4 — EV Vehicle Profiles & Garage Management (KF11, KF12)` ⏳
+- **Last Completed Gate:** `Module 4 — EV Vehicle Profiles & Garage Management` ✅
+- **Current Active Target:** `Module 5 — Backend Route Planner, OSRM Polyline & Range Anxiety Engine (KF10, KF13, KF14, KF15)` ⏳
 - **Repository:** `https://github.com/ariff-dev04/chargetrail-v2.git` (`main` branch)
 
 ---
@@ -79,11 +79,26 @@
   - `frontend/lib/features/stations/presentation/map_discovery_screen.dart`: Added `+ Add Charger` floating action button opening the submission sheet.
   - `frontend/test/community_survey_test.dart`: 4 comprehensive tests for consensus models, micro survey card, and submission sheet.
 
-### [ ] Module 4: EV Vehicle Profiles & Garage Management (NEXT UP)
-- **Scope (`KF11`, `KF12`):** Vehicle specifications, battery capacity, real-world consumption curves, and charging session timers.
+### [x] Module 4: EV Vehicle Profiles & Garage Management (COMPLETED)
+- **Status:** Verified (24/24 `pytest` passed in 4.04s, 0 `ruff` warnings, 22/22 `flutter test` passed, 0 `flutter analyze` issues, all files 80–335 lines).
+- **Delivered Artifacts (`KF11`, `KF12`):**
+  - `backend/app/models/vehicle.py`: SQLAlchemy 2.0 `VehicleProfile` model supporting battery capacity, range, consumption rate, peak DC charge speed, reserve SoC buffer, and primary EV selection.
+  - `backend/app/schemas/vehicle.py`: Pydantic v2 schemas (`VehiclePresetRead`, `VehicleCreate`, `VehicleUpdate`, `VehicleRead`) with computed effective safe range.
+  - `backend/app/services/vehicle_presets.py`: Curated factory specifications for 6 popular Malaysian EVs (`Proton e.MAS 7 Prime`, `BYD Atto 3 Extended Range`, `Tesla Model 3 Long Range`, `BYD Dolphin`, `Hyundai IONIQ 5`, `Nissan Leaf e+`).
+  - `backend/app/repositories/vehicle_repository.py`: Multi-vehicle garage operations, automatic single-primary enforcement, and deletion with primary auto-promotion.
+  - `backend/app/services/vehicle_service.py`: Business logic for garage profiles, reserve buffer range math, and presets catalog.
+  - `backend/app/api/v1/vehicles.py` & `router.py`: REST endpoints `/vehicles/presets`, `/vehicles`, `/vehicles/{id}`, `/vehicles/{id}/select`, and `/vehicles/{id}` (delete).
+  - `backend/tests/test_vehicles.py`: Async tests verifying preset catalog retrieval, primary EV toggling, reserve SoC effective range calculation, and deletion.
+  - `frontend/lib/features/vehicles/domain/vehicle_model.dart`: Immutable `VehicleProfile` model with physics methods for range at SoC, safe usable range after reserve buffer, and 20%->80% charge duration estimation.
+  - `frontend/lib/features/vehicles/data/vehicle_repository.dart`: Dio client with SharedPreferences offline cache pre-seeded with Malaysian presets and default garage.
+  - `frontend/lib/features/vehicles/presentation/vehicle_controller.dart`: Riverpod `VehicleNotifier` managing multi-car garage, active EV selection, and SoC slider.
+  - `frontend/lib/features/vehicles/presentation/garage_screen.dart`: Complete garage screen with active vehicle hero card, battery SoC slider (10%-100%), real-time safe range telemetry, garage vehicles list, and 1-tap Malaysian preset addition sheet.
+  - `frontend/lib/features/stations/presentation/widgets/station_detail_sheet.dart`: Integrated real-time active EV charging estimate badge (`Est. 20%->80% for <Active EV>: ~XX mins`).
+  - `frontend/lib/main.dart`: Wired `GarageScreen` as the 3rd destination (`EV Garage`) in the app shell `NavigationBar`.
+  - `frontend/test/vehicle_garage_test.dart`: 4 comprehensive unit and widget tests for physics math, controller state, and garage UI.
 
-### [ ] Module 5: Battery-Aware Route Planner (`OSRM` + `PostGIS Corridor`)
-- **Scope (`KF10`, `KF11`):** Backend OSRM polyline fetch + PostGIS `ST_DWithin` corridor query + 3 stop strategies + Flutter route timeline & charger swapping.
+### [ ] Module 5: Backend Route Planner, OSRM Polyline & Range Anxiety Engine (NEXT UP)
+- **Scope (`KF10`, `KF13`, `KF14`, `KF15`):** Open routing integration via OSRM, PostGIS spatial corridor buffer (`ST_DWithin`), 3 charging stop strategies (Fastest Arrival, Fewest Stops, Scenic/Amenities), and battery SoC simulation along the route.
 
 ### [ ] Module 6: CI/CD Pipeline, Observability & Deployment Readiness
 - **Scope:** GitHub Actions (`ruff`, `pytest`, `flutter analyze`, `flutter test`, Flutter Web build) + structured logging & Docker Compose production profile.

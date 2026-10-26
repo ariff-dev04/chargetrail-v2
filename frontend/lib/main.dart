@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/profile_screen.dart';
 import 'features/stations/presentation/map_discovery_screen.dart';
+import 'features/vehicles/presentation/garage_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,6 +49,7 @@ class _AppShellState extends State<AppShell> {
       subtitle: 'Corridor filtering & charging stops strategy (Module 6)',
       icon: Icons.alt_route,
     ),
+    GarageScreen(),
     ProfileScreen(),
   ];
 
@@ -75,6 +77,11 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(Icons.alt_route_outlined),
             selectedIcon: Icon(Icons.alt_route),
             label: 'Route Planner',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.electric_car_outlined),
+            selectedIcon: Icon(Icons.electric_car),
+            label: 'EV Garage',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

@@ -3,6 +3,7 @@
 from app.models.community import MicroSurveyVote, StationReview
 from app.models.station import ChargingStation
 from app.models.user import SavedStation, User
+from app.models.vehicle import VehicleProfile
 
 __all__ = [
     "ChargingStation",
@@ -10,4 +11,5 @@ __all__ = [
     "SavedStation",
     "StationReview",
     "User",
+    "VehicleProfile",
 ]

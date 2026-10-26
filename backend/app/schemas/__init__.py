@@ -24,6 +24,12 @@ from app.schemas.user import (
     UserProfileUpdate,
     UserRegister,
 )
+from app.schemas.vehicle import (
+    VehicleCreate,
+    VehiclePresetRead,
+    VehicleRead,
+    VehicleUpdate,
+)
 
 __all__ = [
     "AccessStep",
@@ -44,4 +50,8 @@ __all__ = [
     "UserProfileRead",
     "UserProfileUpdate",
     "UserRegister",
+    "VehicleCreate",
+    "VehiclePresetRead",
+    "VehicleRead",
+    "VehicleUpdate",
 ]
