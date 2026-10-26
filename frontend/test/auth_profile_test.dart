@@ -124,7 +124,7 @@ void main() {
       expect(find.text('CCS2'), findsWidgets);
       expect(find.text('Type 2'), findsWidgets);
       expect(find.text('CHAdeMO'), findsWidgets);
-      expect(find.textContaining('Saved Stations'), findsOneWidget);
+      expect(find.text('Saved Stations (0)'), findsOneWidget);
       expect(find.text('Log Out'), findsOneWidget);
 
       // Tap Log Out

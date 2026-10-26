@@ -3,8 +3,8 @@
 > **Agent Rule:** Both the Web Orchestrator Agent and Local Gemini CLI must read this file to determine current project state, and update this file whenever a module passes verification.
 
 ## 📊 Current Project State
-- **Last Completed Gate:** `Module 7.5 — Real-Device UAT Bugfixes, Watermark-Free Map Tiles, Real Hardware GPS, Lazy OSM Viewport Charger Discovery with On-Interaction DB Upsert, and Responsive Layout Overflow Fixes` ✅
-- **Project Completion Status:** `100% Complete & Hardened for Real Physical Hardware UAT` 🏆
+- **Last Completed Gate:** `Module 7.6 — Live Server ADB-Reverse Connectivity Fix, Multi-Source Open EV Charger Discovery, and Automatic Nearby Chargers Detection & Carousel` ✅
+- **Project Completion Status:** `100% Complete & Hardened for Physical Device UAT with Multi-Source Open Data & ADB Live Sync` 🏆
 - **Repository:** `https://github.com/ariff-dev04/chargetrail-v2.git` (`main` branch)
 
 ---
@@ -154,3 +154,15 @@
   - `frontend/lib/features/community/presentation/submit_station_sheet.dart`: Added Charger Pin Location card with "Use My GPS" auto-fill, Malaysian City dropdown, and modularized `ModerationQueueTab`.
   - **Pixel Overflow Fixes**: Fixed `RenderFlex overflowed by 16 pixels` in `GarageScreen` active vehicle hero and `RenderFlex overflowed by 15 pixels` in `RouteTelemetryCard` recommended stops header on narrow phone viewports.
   - `frontend/test/uat_fixes_test.dart`: 5 comprehensive tests verifying narrow screen rendering without overflow, pin auto-fill, Nominatim reverse geocoding, and Overpass deduplication.
+
+### [x] Module 7.6: Live Server ADB-Reverse Connectivity Fix, Multi-Source Open EV Charger Discovery, and Automatic Nearby Chargers Detection & Carousel (COMPLETED)
+- **Status:** Verified (31/31 `pytest` passed across 7 suites, 0 `ruff` warnings, 43/43 `flutter test` passed across 8 suites, 0 `flutter analyze` issues, all 94 files strictly under 350 lines).
+- **Delivered Artifacts:**
+  - `frontend/android/app/src/main/AndroidManifest.xml`: Enabled `android:usesCleartextTraffic="true"` to eliminate Android 9+ plaintext HTTP blocking for local server connectivity.
+  - `scripts/run_uat.ps1`: Automated `adb reverse tcp:8000 tcp:8000` to tunnel port 8000 directly through ADB, completely bypassing Windows Firewall on connected phones.
+  - `frontend/lib/features/stations/data/station_repository.dart`: Added multi-target candidate base URL probing (`_dio.options.baseUrl`, `http://127.0.0.1:8000`, `http://10.0.2.2:8000`) with automatic active base URL adoption.
+  - `frontend/lib/features/stations/data/malaysia_ev_registry.dart` (110 lines): 32 open-data EV stations across all Malaysian states with radial search helper.
+  - `frontend/lib/features/stations/data/osm_overpass_service.dart` (197 lines): 3-Tier Open Discovery Engine (Tier 1: Overpass nodes & ways around:15000m; Tier 2: Photon open POI query; Tier 3: Regional Malaysia Open Registry) with 150m deduplication.
+  - `frontend/lib/features/stations/presentation/widgets/nearby_stations_carousel.dart` (203 lines): Horizontal nearby charger carousel with ascending distance chips, Open Data vs Verified DB indicators, and full scrollable list modal.
+  - `frontend/lib/features/stations/presentation/map_discovery_screen.dart`: Wired GPS-triggered nearby scan and carousel integration with on-tap camera movement and details sheet.
+  - `frontend/test/nearby_and_discovery_test.dart`: Comprehensive unit and widget tests for open registry, distance sorting, and carousel interaction.

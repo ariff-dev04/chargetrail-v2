@@ -6,12 +6,12 @@ import 'package:frontend/core/services/location_service.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:latlong2/latlong.dart';
 import '../../community/presentation/submit_station_sheet.dart';
-import '../domain/station_model.dart';
 import 'station_controller.dart';
+import 'widgets/nearby_stations_carousel.dart';
 import 'widgets/station_detail_sheet.dart';
 import 'widgets/station_filter_bar.dart';
 
-/// Main EV Charging Station map discovery view with map styles, GPS, and OSM viewport discovery.
+/// Main EV Charging Station map discovery view with live sync, GPS, and nearby carousel.
 class MapDiscoveryScreen extends ConsumerStatefulWidget {
   const MapDiscoveryScreen({super.key});
 
@@ -28,11 +28,23 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
   Future<void> _handleMyLocation() async {
     final loc = await LocationService().determinePosition();
     ref.read(userLocationProvider.notifier).setLocation(loc);
+    ref.read(stationControllerProvider.notifier).updateReferenceLocation(loc.latitude, loc.longitude);
     _centerMap(loc.latLng, 14.5);
+
+    // Auto-discover nearby open EV chargers around physical GPS
+    ref.read(stationControllerProvider.notifier).scanOsmViewport(
+          centerLat: loc.latitude,
+          centerLng: loc.longitude,
+          minLat: loc.latitude - 0.08,
+          minLng: loc.longitude - 0.08,
+          maxLat: loc.latitude + 0.08,
+          maxLng: loc.longitude + 0.08,
+        );
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Located GPS: ${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)} (${loc.label})'),
+          content: Text('GPS Locked: ${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)} (${loc.label})'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -40,8 +52,13 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
   }
 
   Future<void> _handleScanOsmViewport() async {
+    final center = _mapController.camera.center;
     final bounds = _mapController.camera.visibleBounds;
+    ref.read(stationControllerProvider.notifier).updateReferenceLocation(center.latitude, center.longitude);
+
     final count = await ref.read(stationControllerProvider.notifier).scanOsmViewport(
+          centerLat: center.latitude,
+          centerLng: center.longitude,
           minLat: bounds.southWest.latitude,
           minLng: bounds.southWest.longitude,
           maxLat: bounds.northEast.latitude,
@@ -49,9 +66,14 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
         );
 
     if (mounted) {
+      final total = ref.read(stationControllerProvider).nearbyStations.length;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(count > 0 ? 'Discovered $count live OSM chargers' : 'Viewport already up to date with OSM network'),
+          content: Text(
+            count > 0
+                ? '⚡ Discovered +$count chargers in this area ($total nearby) • Tap any pin to save to DB'
+                : 'Viewport is up to date ($total nearby chargers)',
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -80,6 +102,8 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
                     Marker(point: userLoc.latLng, width: 34, height: 34, child: const UserLocationMarkerWidget()),
                   ...state.filteredStations.map((station) {
                     final isSelected = state.selectedStation?.id == station.id;
+                    final isOpenData = station.source == 'osm_live' || station.source == 'open_data_my';
+
                     return Marker(
                       point: LatLng(station.latitude, station.longitude),
                       width: isSelected ? 48 : 40,
@@ -89,7 +113,7 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
                           notifier.selectStation(station);
                           StationDetailSheet.show(context, station);
                         },
-                        child: _markerIcon(station.maxPowerKw >= 120.0, isSelected, station.source == 'osm_live'),
+                        child: _markerIcon(station.maxPowerKw >= 120.0, isSelected, isOpenData),
                       ),
                     );
                   }),
@@ -111,9 +135,24 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
                   children: [
                     if (state.isOfflineMode)
                       GestureDetector(
-                        onTap: () {
-                          notifier.loadStations();
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reconnecting...'), duration: Duration(seconds: 1)));
+                        onTap: () async {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Checking live backend connectivity...'), duration: Duration(milliseconds: 800)),
+                          );
+                          await notifier.loadStations();
+                          if (!context.mounted) return;
+                          final updated = ref.read(stationControllerProvider);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                !updated.isOfflineMode
+                                    ? '✅ Connected to Live FastAPI Server (${updated.allStations.length} stations synced)'
+                                    : '⚠️ Live backend unreachable — serving ${updated.allStations.length} stations from Local Cache',
+                              ),
+                              backgroundColor: !updated.isOfflineMode ? AppTheme.successGreen : const Color(0xFFD97706),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
                         },
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 6),
@@ -165,61 +204,72 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
             ),
           ),
 
-          // Floating Bottom Controls: Counter, Add Charger & GPS
+          // Floating Bottom Controls: Nearby Chargers Carousel, Counter, Add & GPS
           Positioned(
             bottom: 20,
-            left: 14,
-            right: 14,
+            left: 0,
+            right: 0,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppTheme.cardDark : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 6)],
-                      ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.ev_station, size: 15, color: AppTheme.primaryTeal),
-                        const SizedBox(width: 4),
-                        Text('${state.filteredStations.length} stations', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      ]),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        FloatingActionButton.extended(
-                          heroTag: 'add_station_fab',
-                          onPressed: () => SubmitStationSheet.show(
-                            context,
-                            initialLatitude: userLoc?.latitude ?? _kDefaultCenter.latitude,
-                            initialLongitude: userLoc?.longitude ?? _kDefaultCenter.longitude,
-                          ),
-                          backgroundColor: AppTheme.primaryTeal,
-                          foregroundColor: Colors.white,
-                          icon: const Icon(Icons.add_location_alt, size: 15),
-                          label: const Text('Add', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
-                        const SizedBox(width: 6),
-                        FloatingActionButton.small(
-                          heroTag: 'my_location_fab',
-                          onPressed: _handleMyLocation,
-                          backgroundColor: isDark ? AppTheme.cardDark : Colors.white,
-                          foregroundColor: AppTheme.primaryTeal,
-                          child: const Icon(Icons.my_location, size: 18),
-                        ),
-                      ],
-                    ),
-                  ],
+                // Nearby Chargers Horizontal Carousel
+                NearbyStationsCarousel(
+                  stations: state.nearbyStations,
+                  distanceCalculator: (lat, lng) => state.distanceKmTo(lat, lng),
+                  onStationTap: (station) {
+                    notifier.selectStation(station);
+                    _centerMap(LatLng(station.latitude, station.longitude), 15.0);
+                    StationDetailSheet.show(context, station);
+                  },
                 ),
-                if (state.selectedStation != null) ...[
-                  const SizedBox(height: 8),
-                  _buildPreviewCard(context, state.selectedStation!, isDark),
-                ],
+                const SizedBox(height: 8),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.cardDark : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 6)],
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.ev_station, size: 15, color: AppTheme.primaryTeal),
+                          const SizedBox(width: 4),
+                          Text('${state.filteredStations.length} in view', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ]),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FloatingActionButton.extended(
+                            heroTag: 'add_station_fab',
+                            onPressed: () => SubmitStationSheet.show(
+                              context,
+                              initialLatitude: userLoc?.latitude ?? _kDefaultCenter.latitude,
+                              initialLongitude: userLoc?.longitude ?? _kDefaultCenter.longitude,
+                            ),
+                            backgroundColor: AppTheme.primaryTeal,
+                            foregroundColor: Colors.white,
+                            icon: const Icon(Icons.add_location_alt, size: 15),
+                            label: const Text('Add', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 6),
+                          FloatingActionButton.small(
+                            heroTag: 'my_location_fab',
+                            onPressed: _handleMyLocation,
+                            backgroundColor: isDark ? AppTheme.cardDark : Colors.white,
+                            foregroundColor: AppTheme.primaryTeal,
+                            child: const Icon(Icons.my_location, size: 18),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -228,8 +278,8 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
     );
   }
 
-  Widget _markerIcon(bool isUltraFast, bool isSelected, bool isOsmLive) {
-    final color = isOsmLive ? const Color(0xFF0284C7) : (isUltraFast ? AppTheme.ultraFastColor : AppTheme.primaryTeal);
+  Widget _markerIcon(bool isUltraFast, bool isSelected, bool isOpenData) {
+    final color = isOpenData ? const Color(0xFF0284C7) : (isUltraFast ? AppTheme.ultraFastColor : AppTheme.primaryTeal);
     return Container(
       decoration: BoxDecoration(
         color: color,
@@ -238,41 +288,7 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 5)],
       ),
       child: Center(
-        child: Icon(isUltraFast ? Icons.bolt : (isOsmLive ? Icons.public : Icons.ev_station), color: Colors.white, size: isSelected ? 24 : 20),
-      ),
-    );
-  }
-
-  Widget _buildPreviewCard(BuildContext context, ChargingStation station, bool isDark) {
-    return GestureDetector(
-      onTap: () => StationDetailSheet.show(context, station),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8)],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: AppTheme.primaryTeal.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.ev_station, color: AppTheme.primaryTeal, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(station.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text('${station.operatorName ?? "Community"} • ${station.maxPowerKw.toInt()} kW', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
-          ],
-        ),
+        child: Icon(isUltraFast ? Icons.bolt : (isOpenData ? Icons.public : Icons.ev_station), color: Colors.white, size: isSelected ? 24 : 20),
       ),
     );
   }

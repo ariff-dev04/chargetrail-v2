@@ -107,6 +107,12 @@ if (-not $ApiUrl) {
     }
 }
 
+# 5.1 Configure ADB reverse port forwarding for physical Android & emulators
+try {
+    & adb reverse tcp:8000 tcp:8000 2>$null
+    Write-Host "UAT: ADB reverse port 8000 established (bypasses Windows Firewall)" -ForegroundColor Green
+} catch {}
+
 Write-Host ""
 Write-Host "UAT: Target Device   : $Device" -ForegroundColor Green
 Write-Host "UAT: API Endpoint    : $ApiUrl" -ForegroundColor Green

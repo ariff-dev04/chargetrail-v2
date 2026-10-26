@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:frontend/core/config/api_config.dart';
 import '../domain/station_model.dart';
 import 'station_local_cache.dart';
@@ -29,32 +30,51 @@ class StationRepository {
     double? maxLat,
     double? maxLng,
   }) async {
-    try {
-      final queryParams = <String, dynamic>{};
-      if (minLat != null && minLng != null && maxLat != null && maxLng != null) {
-        queryParams['min_lat'] = minLat;
-        queryParams['min_lng'] = minLng;
-        queryParams['max_lat'] = maxLat;
-        queryParams['max_lng'] = maxLng;
-      }
+    final queryParams = <String, dynamic>{};
+    if (minLat != null && minLng != null && maxLat != null && maxLng != null) {
+      queryParams['min_lat'] = minLat;
+      queryParams['min_lng'] = minLng;
+      queryParams['max_lat'] = maxLat;
+      queryParams['max_lng'] = maxLng;
+    }
 
-      final response = await _dio.get(
-        '/api/v1/stations',
-        queryParameters: queryParams.isNotEmpty ? queryParams : null,
-      );
+    // Try primary baseUrl, with automatic fallback for ADB reverse (127.0.0.1) & emulator (10.0.2.2)
+    final candidateBases = <String>{
+      _dio.options.baseUrl,
+      if (!kIsWeb) ...[
+        'http://127.0.0.1:8000',
+        'http://10.0.2.2:8000',
+        'http://localhost:8000',
+      ],
+    }.toList();
 
-      if (response.statusCode == 200 && response.data is List) {
-        final list = (response.data as List<dynamic>)
-            .map((item) => ChargingStation.fromJson(item as Map<String, dynamic>))
-            .toList();
+    for (final base in candidateBases) {
+      try {
+        final client = base == _dio.options.baseUrl
+            ? _dio
+            : Dio(
+                BaseOptions(
+                  baseUrl: base,
+                  connectTimeout: const Duration(milliseconds: 1500),
+                  receiveTimeout: const Duration(milliseconds: 1500),
+                ),
+              );
 
-        // Asynchronously update local cache without awaiting blocking
-        _localCache.saveStations(list);
+        final response = await client.get(
+          '/api/v1/stations',
+          queryParameters: queryParams.isNotEmpty ? queryParams : null,
+        );
 
-        return (stations: list, isOffline: false);
-      }
-    } catch (_) {
-      // Network failure, connection refused, or backend offline
+        if (response.statusCode == 200 && response.data is List) {
+          final list = (response.data as List<dynamic>)
+              .map((item) => ChargingStation.fromJson(item as Map<String, dynamic>))
+              .toList();
+
+          _dio.options.baseUrl = base;
+          _localCache.saveStations(list);
+          return (stations: list, isOffline: false);
+        }
+      } catch (_) {}
     }
 
     // Graceful offline failover
