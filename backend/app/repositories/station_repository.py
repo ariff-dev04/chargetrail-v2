@@ -93,6 +93,42 @@ class StationRepository:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
+    async def find_by_coordinates(
+        self,
+        latitude: float,
+        longitude: float,
+        tolerance_km: float = 0.15,
+    ) -> ChargingStation | None:
+        """Find an existing station near given coordinates within tolerance."""
+        delta_lat = tolerance_km / 111.0
+        delta_lng = tolerance_km / 111.0
+        query = select(ChargingStation).where(
+            ChargingStation.latitude >= (latitude - delta_lat),
+            ChargingStation.latitude <= (latitude + delta_lat),
+            ChargingStation.longitude >= (longitude - delta_lng),
+            ChargingStation.longitude <= (longitude + delta_lng),
+        )
+        result = await self.session.execute(query)
+        return result.scalars().first()
+
+    async def create_station(self, station_in: StationCreate) -> ChargingStation:
+        """Create and persist a new charging station record."""
+        station_dict = station_in.model_dump()
+        station_dict["plug_types"] = [
+            p.model_dump() if hasattr(p, "model_dump") else p for p in station_in.plug_types
+        ]
+        station_dict["how_to_access"] = [
+            step.model_dump() if hasattr(step, "model_dump") else step
+            for step in station_in.how_to_access
+        ]
+        station_dict["location"] = f"SRID=4326;POINT({station_in.longitude} {station_in.latitude})"
+
+        station = ChargingStation(**station_dict)
+        self.session.add(station)
+        await self.session.commit()
+        await self.session.refresh(station)
+        return station
+
     async def upsert_seed_stations(
         self,
         stations_data: list[StationCreate],

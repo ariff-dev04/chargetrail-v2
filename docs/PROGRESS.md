@@ -3,8 +3,8 @@
 > **Agent Rule:** Both the Web Orchestrator Agent and Local Gemini CLI must read this file to determine current project state, and update this file whenever a module passes verification.
 
 ## 📊 Current Project State
-- **Last Completed Gate:** `Module 7 — CI/CD Pipeline, Observability, Thesis Evaluation & Final Full-Stack UAT Guide Upgrade` ✅
-- **Project Completion Status:** `100% Complete (All Modules 0 through 7 Verified & Production-Ready)` 🏆
+- **Last Completed Gate:** `Module 7.5 — Real-Device UAT Bugfixes, Watermark-Free Map Tiles, Real Hardware GPS, Lazy OSM Viewport Charger Discovery with On-Interaction DB Upsert, and Responsive Layout Overflow Fixes` ✅
+- **Project Completion Status:** `100% Complete & Hardened for Real Physical Hardware UAT` 🏆
 - **Repository:** `https://github.com/ariff-dev04/chargetrail-v2.git` (`main` branch)
 
 ---
@@ -125,21 +125,9 @@
 ### [x] Module 6.5: Real-Device UI/UX Polish: Map Layer Switcher, Exact GPS Location, Expanded 12-Station Malaysian Dataset & Unified Wi-Fi API Config (COMPLETED)
 - **Status:** Verified (28/28 `pytest` passed, 0 `ruff` warnings, 34/34 `flutter test` passed with ZERO OSM console warnings, 0 `flutter analyze` issues, all files 23–336 lines).
 - **Delivered Artifacts:**
-  - `frontend/lib/core/config/map_tile_config.dart`: Open-source $0 raster tile engine (`defaultStreet` CartoDB Voyager, `satellite` Esri World Imagery, `dark` CartoDB Dark Matter), Riverpod `mapTileStyleProvider`, and compact floating `MapStyleSelectorButton` widget. Completely eliminates `tile.openstreetmap.org` debug console warnings!
+  - `frontend/lib/core/config/map_tile_config.dart`: Open-source $0 raster tile engine (`defaultStreet`, `satellite`, `dark`), Riverpod `mapTileStyleProvider`, and compact floating `MapStyleSelectorButton` widget.
   - `frontend/lib/core/services/location_service.dart`: `LocationService` with `UserLocationNotifier` and pulsing blue radar `UserLocationMarkerWidget` showing resolved user GPS coordinates with a feedback SnackBar on both Map Discovery and Route Planner.
-  - Expanded Peninsular Malaysia dataset to 12 flagship EV stations:
-    1. Suria KLCC Gentari Charging Hub (Kuala Lumpur, 180kW DC)
-    2. Pavilion Bukit Bintang JomCharge (Kuala Lumpur, 120kW DC, B2 Pillar D8)
-    3. IOI City Mall Putrajaya JomCharge (Putrajaya, 120kW DC, 24 Hours)
-    4. Cyberjaya Tamarind Square Gentari (Selangor, 60kW DC, Level P1)
-    5. Sunway Pyramid chargEV Station (Selangor, 60kW DC)
-    6. Genting Highlands SkyAvenue JomCharge (Pahang, 120kW DC, 24 Hours)
-    7. Shell Recharge Tapah RSA Northbound (Perak, 180kW DC, 24 Hours)
-    8. Ipoh Sunway Lost World JomCharge (Perak, 120kW DC)
-    9. Gurney Plaza Shell Recharge (Penang, 60kW DC)
-    10. Shell Recharge Seremban RSA Southbound (Negeri Sembilan, 180kW DC, 24 Hours)
-    11. Ayer Keroh Overhead Bridge RSA Gentari (Melaka, 150kW DC, 24 Hours)
-    12. Mid Valley Southkey Gentari Hub (Johor Bahru, 120kW DC + CHAdeMO, 24 Hours)
+  - Expanded Peninsular Malaysia dataset to 12 flagship EV stations.
   - Synchronized in `backend/app/services/station_seed_data.py` (296 lines) and `frontend/lib/features/stations/data/station_local_cache.dart` (336 lines).
   - Verified unified `ApiConfig.baseUrl` across all 5 repositories (`StationRepository`, `AuthRepository`, `CommunityRepository`, `VehicleRepository`, `RouteRepository`).
   - Added 1-tap "Reconnect to Live Server" on the offline banner in `MapDiscoveryScreen`.
@@ -154,3 +142,15 @@
   - `.github/workflows/ci.yml`: Production GitHub Actions CI/CD pipeline enforcing Ruff lint/format, pytest, Flutter analyze, Flutter test, and file size ceilings (< 400 lines) on push and pull request.
   - `docs/THESIS_EVALUATION.md`: Defect resolution matrix for all legacy v1 defects (`S-01` to `S-04`, `B-01` to `B-04`, `C-01` to `C-05`) and quantitative engineering comparison (100% $0 API cost, 10x modularization, 64 automated tests, < 350ms route simulation).
   - `docs/UAT_GUIDE.md`: Comprehensive end-to-end visual testing checklist covering all 4 tabs, 12 Malaysian hubs, map style switcher, GPS location, community moderation queue, Survei Mikro consensus, EV garage telemetry, and highway route planner.
+
+### [x] Module 7.5: Real-Device UAT Bugfixes, Watermark-Free Map Tiles, Real Hardware GPS, Lazy OSM Viewport Charger Discovery with On-Interaction DB Upsert, and Responsive Layout Overflow Fixes (COMPLETED)
+- **Status:** Verified (31/31 `pytest` passed across 7 suites, 0 `ruff` warnings, 39/39 `flutter test` passed across 7 suites, 0 `flutter analyze` issues, all 91 files strictly under 350 lines).
+- **Delivered Artifacts:**
+  - `frontend/lib/core/config/map_tile_config.dart`: Replaced CartoDB watermark tiles with 100% watermark-free, zero-API-key open tile servers (Esri World Street Map, Esri World Imagery, Esri Canvas World Dark Gray Base).
+  - `frontend/lib/core/services/location_service.dart`: Upgraded with real hardware phone GPS via `geolocator: ^13.0.4` + Nominatim reverse geocoding with nearest-Malaysian-city fallback. Added Android fine/coarse location permissions in `AndroidManifest.xml`.
+  - `frontend/lib/features/stations/data/osm_overpass_service.dart`: Lazy OpenStreetMap Overpass live charging station discovery with spatial cell cache and 150m deduplication.
+  - `backend/app/api/v1/stations.py` & `frontend/lib/features/stations/data/station_repository.dart`: Added `POST /api/v1/stations/upsert-external` for on-interaction persistence of OSM live pins to database and local cache.
+  - `frontend/lib/features/stations/presentation/map_discovery_screen.dart`: Repositioned `MapStyleSelectorButton` right beneath the search/filter bar and added a compact `"🔄 Scan Viewport OSM"` discovery pill button.
+  - `frontend/lib/features/community/presentation/submit_station_sheet.dart`: Added Charger Pin Location card with "Use My GPS" auto-fill, Malaysian City dropdown, and modularized `ModerationQueueTab`.
+  - **Pixel Overflow Fixes**: Fixed `RenderFlex overflowed by 16 pixels` in `GarageScreen` active vehicle hero and `RenderFlex overflowed by 15 pixels` in `RouteTelemetryCard` recommended stops header on narrow phone viewports.
+  - `frontend/test/uat_fixes_test.dart`: 5 comprehensive tests verifying narrow screen rendering without overflow, pin auto-fill, Nominatim reverse geocoding, and Overpass deduplication.

@@ -15,6 +15,7 @@ from app.schemas.station import (
     AccessStep,
     PlugInfo,
     SeedResponse,
+    StationCreate,
     StationFilterParams,
     StationRead,
 )
@@ -107,6 +108,19 @@ class StationService:
             total_count=total,
             message=message,
         )
+
+    async def upsert_external_station(self, station_in: StationCreate) -> StationRead:
+        """Idempotently upsert an externally discovered OSM or community station upon interaction."""
+        existing = await self.repository.find_by_coordinates(
+            latitude=station_in.latitude,
+            longitude=station_in.longitude,
+            tolerance_km=0.15,
+        )
+        if existing:
+            return self._entity_to_dto(existing)
+
+        created = await self.repository.create_station(station_in)
+        return self._entity_to_dto(created)
 
     @staticmethod
     def _entity_to_dto(entity: ChargingStation) -> StationRead:

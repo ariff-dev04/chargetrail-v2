@@ -21,15 +21,15 @@ void main() {
     test('MapTileStyle provides open-source raster tile URLs', () {
       expect(
         MapTileStyle.defaultStreet.urlTemplate,
-        contains('cartocdn.com/rastertiles/voyager'),
+        contains('World_Street_Map/MapServer'),
       );
       expect(
         MapTileStyle.satellite.urlTemplate,
-        contains('arcgisonline.com'),
+        contains('World_Imagery/MapServer'),
       );
       expect(
         MapTileStyle.dark.urlTemplate,
-        contains('cartocdn.com/dark_all'),
+        contains('World_Dark_Gray_Base/MapServer'),
       );
 
       expect(MapTileStyle.defaultStreet.label, equals('Street'));

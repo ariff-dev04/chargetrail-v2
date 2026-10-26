@@ -9,6 +9,7 @@ from app.core.database import get_db_session
 from app.repositories.station_repository import StationRepository
 from app.schemas.station import (
     SeedResponse,
+    StationCreate,
     StationFilterParams,
     StationRead,
 )
@@ -62,3 +63,17 @@ async def seed_sample_stations(
 ) -> SeedResponse:
     """Idempotently insert verified Malaysian EV charging station samples."""
     return await service.seed_sample_stations()
+
+
+@router.post(
+    "/upsert-external",
+    response_model=StationRead,
+    status_code=status.HTTP_200_OK,
+    summary="Idempotently upsert an external OSM station upon interaction",
+)
+async def upsert_external_station(
+    station_in: StationCreate,
+    service: StationService = Depends(get_station_service),
+) -> StationRead:
+    """Save or return existing station when driver interacts with an external OSM pin."""
+    return await service.upsert_external_station(station_in)

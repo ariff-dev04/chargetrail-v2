@@ -160,6 +160,8 @@ class RouteTelemetryCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -198,12 +200,17 @@ class RouteTelemetryCard extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Recommended Charging Stops (${plan.recommendedStops.length})',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            Expanded(
+              child: Text(
+                'Recommended Charging Stops (${plan.recommendedStops.length})',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
             ),
+            const SizedBox(width: 8),
             const Text(
-              'Tap for details & pillar guide',
+              'Tap for access guide',
               style: TextStyle(fontSize: 11, color: Colors.grey),
             ),
           ],

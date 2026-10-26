@@ -80,4 +80,25 @@ class StationRepository {
       return null;
     }
   }
+
+  /// Persist an externally discovered OSM or community station to backend & cache upon interaction.
+  Future<ChargingStation> upsertExternalStation(ChargingStation station) async {
+    try {
+      final res = await _dio.post(
+        '/api/v1/stations/upsert-external',
+        data: station.toJson(),
+      );
+      if (res.statusCode == 200 && res.data is Map<String, dynamic>) {
+        return ChargingStation.fromJson(res.data as Map<String, dynamic>);
+      }
+    } catch (_) {}
+
+    // Offline / fallback: save into local cache
+    final cached = await _localCache.getCachedStations();
+    if (!cached.any((s) => s.id == station.id || s.name == station.name)) {
+      final updated = [...cached, station];
+      await _localCache.saveStations(updated);
+    }
+    return station;
+  }
 }

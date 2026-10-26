@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Available map layer raster styles using open-source $0 tile servers.
+/// Available map layer raster styles using open-source, watermark-free $0 tile servers.
 enum MapTileStyle {
   defaultStreet,
   satellite,
@@ -19,13 +19,14 @@ enum MapTileStyle {
         MapTileStyle.dark => Icons.dark_mode_outlined,
       };
 
+  /// High-resolution, key-free open tile server endpoints with ZERO watermarks.
   String get urlTemplate => switch (this) {
         MapTileStyle.defaultStreet =>
-          'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
         MapTileStyle.satellite =>
           'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         MapTileStyle.dark =>
-          'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+          'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
       };
 }
 

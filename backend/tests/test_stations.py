@@ -182,3 +182,42 @@ async def test_get_station_by_id_and_not_found(async_client: AsyncClient) -> Non
     not_found_res = await async_client.get(f"/api/v1/stations/{non_existent_id}")
     assert not_found_res.status_code == 404
     assert "not found" in not_found_res.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_upsert_external_station_on_interaction(async_client: AsyncClient) -> None:
+    """Verify that interacting with an external OSM station idempotently saves it to the DB."""
+    osm_payload = {
+        "name": "Kuala Lumpur Sentral EV Hub (OSM Live)",
+        "operator_name": "OpenStreetMap Community",
+        "address": "Jalan Stesen Sentral 5, Kuala Lumpur",
+        "city": "Kuala Lumpur",
+        "state": "Wilayah Persekutuan Kuala Lumpur",
+        "latitude": 3.1340,
+        "longitude": 101.6860,
+        "plug_types": [{"type": "CCS2", "power_kw": 60.0, "count": 2}],
+        "max_power_kw": 60.0,
+        "is_available": True,
+        "is_24_hours": True,
+        "charging_cost_myr": 1.40,
+        "parking_fee_myr": 0.0,
+        "parking_level": "Outdoor Carpark",
+        "operation_hours": "24 Hours",
+        "amenities": ["Dining", "Restroom"],
+        "how_to_access": [{"step_number": 1, "instruction": "Located via live OSM network."}],
+        "source": "osm_live",
+        "is_verified": False,
+    }
+
+    # 1. First interaction: inserts new station
+    first_res = await async_client.post("/api/v1/stations/upsert-external", json=osm_payload)
+    assert first_res.status_code == 200
+    first_station = first_res.json()
+    assert first_station["name"] == osm_payload["name"]
+    station_id = first_station["id"]
+
+    # 2. Second interaction: returns existing station without creating duplicates
+    second_res = await async_client.post("/api/v1/stations/upsert-external", json=osm_payload)
+    assert second_res.status_code == 200
+    second_station = second_res.json()
+    assert second_station["id"] == station_id

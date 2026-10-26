@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../data/osm_overpass_service.dart';
 import '../data/station_local_cache.dart';
 import '../data/station_repository.dart';
 import '../domain/station_model.dart';
@@ -164,6 +165,41 @@ class StationNotifier extends Notifier<StationState> {
       selectedStation: station,
       clearSelectedStation: station == null,
     );
+
+    // On-interaction upsert: if user inspects an external OSM station, persist it to DB & cache
+    if (station != null && station.source == 'osm_live') {
+      ref.read(stationRepositoryProvider).upsertExternalStation(station);
+    }
+  }
+
+  /// Lazy discovery of live OSM charging stations within visible viewport bounding box.
+  Future<int> scanOsmViewport({
+    required double minLat,
+    required double minLng,
+    required double maxLat,
+    required double maxLng,
+  }) async {
+    try {
+      final overpass = OsmOverpassService();
+      final discovered = await overpass.fetchViewportStations(
+        minLat: minLat,
+        minLng: minLng,
+        maxLat: maxLat,
+        maxLng: maxLng,
+        existingStations: state.allStations,
+      );
+
+      if (discovered.isNotEmpty) {
+        final merged = [...state.allStations, ...discovered];
+        final filtered = merged.where(state.activeFilter.matches).toList();
+        state = state.copyWith(
+          allStations: merged,
+          filteredStations: filtered,
+        );
+        return discovered.length;
+      }
+    } catch (_) {}
+    return 0;
   }
 }
 

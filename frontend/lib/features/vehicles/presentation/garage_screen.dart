@@ -42,9 +42,13 @@ class _GarageScreenState extends ConsumerState<GarageScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'My EV Garage (${state.garageVehicles.length})',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  'My EV Garage (${state.garageVehicles.length})',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
               TextButton.icon(
                 onPressed: () => _showAddVehicleSheet(context),
@@ -92,19 +96,26 @@ class _GarageScreenState extends ConsumerState<GarageScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    active.displayName,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '${active.batteryCapacityKwh} kWh • ${active.maxDcChargeKw.toInt()} kW DC Peak • ${active.connectorType}',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      active.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      '${active.batteryCapacityKwh} kWh • ${active.maxDcChargeKw.toInt()} kW DC Peak • ${active.connectorType}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -128,17 +139,26 @@ class _GarageScreenState extends ConsumerState<GarageScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    currentSoc > 20 ? Icons.battery_charging_full : Icons.battery_alert,
-                    color: currentSoc > 20 ? AppTheme.primaryTeal : Colors.orange,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 6),
-                  const Text('Current Battery SoC:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                ],
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      currentSoc > 20 ? Icons.battery_charging_full : Icons.battery_alert,
+                      color: currentSoc > 20 ? AppTheme.primaryTeal : Colors.orange,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 6),
+                    const Flexible(
+                      child: Text(
+                        'Current Battery SoC:',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Text(
                 '$currentSoc%',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal),
