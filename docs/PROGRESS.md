@@ -3,8 +3,8 @@
 > **Agent Rule:** Both the Web Orchestrator Agent and Local Gemini CLI must read this file to determine current project state, and update this file whenever a module passes verification.
 
 ## 📊 Current Project State
-- **Last Completed Gate:** `Module 2 — Authentication, User Profiles & Saved Station Bookmarks` ✅
-- **Current Active Target:** `Module 3 — Community Contributions & Survei Mikro Consensus Engine (Backend + Flutter)` ⏳
+- **Last Completed Gate:** `Module 3 — Community Contributions, Admin Moderation & Survei Mikro Consensus Engine` ✅
+- **Current Active Target:** `Module 4 — EV Vehicle Profiles & Garage Management (KF11, KF12)` ⏳
 - **Repository:** `https://github.com/ariff-dev04/chargetrail-v2.git` (`main` branch)
 
 ---
@@ -62,11 +62,25 @@
   - `frontend/lib/main.dart`: Integrated `ProfileScreen` as the 3rd destination in the `NavigationBar`.
   - `frontend/test/auth_profile_test.dart`: Unit and widget tests for models, auth notifier, and profile screen.
 
-### [ ] Module 3: Community Contributions & `Survei Mikro` Consensus Engine (NEXT UP)
-- **Scope (`KF06`, `KF07`, `KF09`):** Add hidden station, propose field edits, report charger issues, and 5-vote server-enforced consensus engine.
+### [x] Module 3: Community Contributions, Admin Moderation & Survei Mikro Consensus Engine (COMPLETED)
+- **Status:** Verified (20/20 `pytest` passed in 3.78s, 0 `ruff` warnings, 17/17 `flutter test` passed, 0 `flutter analyze` issues, all files 80–335 lines).
+- **Delivered Artifacts (`KF06`, `KF07`, `KF09`, `KF16`):**
+  - `backend/app/models/community.py`: SQLAlchemy 2.0 `StationReview` and `MicroSurveyVote` models for check-in reviews and 1-tap telemetry dimensions.
+  - `backend/app/schemas/community.py`: Pydantic v2 schemas (`ReviewCreate`, `ReviewRead`, `MicroSurveyCreate`, `MicroSurveyConsensusRead`, `StationModerationUpdate`).
+  - `backend/app/repositories/community_repository.py`: Async community station creation with `is_verified=False`, moderation queue queries, review rating recomputations, and micro-survey vote tallies.
+  - `backend/app/services/community_service.py`: 3-vote consensus engine evaluating plug status (`out_of_order` triggers `is_available = False`), parking fee (`free` triggers `parking_fee_myr = 0.0`), and access difficulty.
+  - `backend/app/api/v1/community.py` & `router.py`: REST endpoints `/community/stations`, `/community/stations/pending`, `/community/stations/{id}/moderate`, `/community/stations/{id}/reviews`, and `/community/stations/{id}/micro-survey`.
+  - `backend/tests/test_community.py`: Comprehensive tests for station submission and approval, review rating recalculation, and 3-vote consensus auto-updates.
+  - `frontend/lib/features/community/domain/community_models.dart`: Immutable `StationReview` and `MicroSurveyConsensus` models with summary badge text logic.
+  - `frontend/lib/features/community/data/community_repository.dart`: Dio client with SharedPreferences offline failover for offline review and consensus testing.
+  - `frontend/lib/features/community/presentation/community_controller.dart`: Riverpod `CommunityNotifier` managing reviews, votes, pending stations, and moderation actions.
+  - `frontend/lib/features/community/presentation/widgets/micro_survey_card.dart`: Embedded widget in `StationDetailSheet` with 1-tap voting chips, consensus badge, and check-in review form.
+  - `frontend/lib/features/community/presentation/submit_station_sheet.dart`: 2-tab modal sheet for Submit Charger (`KF06`) and Admin Moderation Queue (`KF09`) with 1-tap Approve & Publish.
+  - `frontend/lib/features/stations/presentation/map_discovery_screen.dart`: Added `+ Add Charger` floating action button opening the submission sheet.
+  - `frontend/test/community_survey_test.dart`: 4 comprehensive tests for consensus models, micro survey card, and submission sheet.
 
-### [ ] Module 4: Live Charging Session, Queue Timer & Verified Reviews
-- **Scope (`KF12`, `KF13`):** 4 live actions (*Charging*, *Finish*, *Could Not Charge*, *Waiting*), local countdown timer, visit-verified reviews, and gamification stats.
+### [ ] Module 4: EV Vehicle Profiles & Garage Management (NEXT UP)
+- **Scope (`KF11`, `KF12`):** Vehicle specifications, battery capacity, real-world consumption curves, and charging session timers.
 
 ### [ ] Module 5: Battery-Aware Route Planner (`OSRM` + `PostGIS Corridor`)
 - **Scope (`KF10`, `KF11`):** Backend OSRM polyline fetch + PostGIS `ST_DWithin` corridor query + 3 stop strategies + Flutter route timeline & charger swapping.

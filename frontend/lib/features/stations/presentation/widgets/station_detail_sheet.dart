@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import '../../../auth/presentation/auth_controller.dart';
+import '../../../community/presentation/widgets/micro_survey_card.dart';
 import '../../domain/station_model.dart';
 
 /// Modal detail sheet showing tariffs, parking level, plugs, and access steps.
@@ -175,6 +176,11 @@ class StationDetailSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
               ],
+
+              // Survei Mikro & Driver Reviews (Module 3)
+              const Divider(height: 24),
+              MicroSurveyCard(stationId: station.id),
+              const SizedBox(height: 16),
 
               FilledButton.icon(
                 onPressed: onNavigatePressed ?? () => Navigator.of(context).pop(),

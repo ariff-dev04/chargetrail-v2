@@ -76,6 +76,7 @@ class ChargingStation {
   final double rating;
   final int reviewCount;
   final bool isVerified;
+  final String source;
   final double? distanceKm;
 
   const ChargingStation({
@@ -101,6 +102,7 @@ class ChargingStation {
     this.rating = 0.0,
     this.reviewCount = 0,
     this.isVerified = true,
+    this.source = 'community',
     this.distanceKm,
   });
 
@@ -141,6 +143,7 @@ class ChargingStation {
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       reviewCount: json['review_count'] as int? ?? 0,
       isVerified: json['is_verified'] as bool? ?? true,
+      source: json['source'] as String? ?? 'community',
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
     );
   }
@@ -168,6 +171,7 @@ class ChargingStation {
         'rating': rating,
         'review_count': reviewCount,
         'is_verified': isVerified,
+        'source': source,
         'distance_km': distanceKm,
       };
 }

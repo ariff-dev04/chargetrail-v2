@@ -184,9 +184,9 @@ void main() {
         findsOneWidget,
       );
 
-      // Scroll further down to reveal Navigation CTA button
-      await tester.drag(find.byType(ListView), const Offset(0, -300));
-      await tester.pumpAndSettle();
+      // Scroll further down to reveal Navigation CTA button (past MicroSurveyCard)
+      await tester.drag(find.byType(ListView), const Offset(0, -600));
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Verify Navigation CTA button
       expect(find.text('Navigate to Station'), findsOneWidget);

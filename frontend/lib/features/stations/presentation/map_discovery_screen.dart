@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:latlong2/latlong.dart';
+import '../../community/presentation/submit_station_sheet.dart';
 import '../domain/station_model.dart';
 import 'station_controller.dart';
 import 'widgets/station_detail_sheet.dart';
@@ -182,14 +183,27 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
                       ),
                     ),
 
-                    // Map Recenter Action Floating Button
-                    FloatingActionButton.small(
-                      heroTag: 'recenter_map_fab',
-                      onPressed: () => _centerMap(_kDefaultCenter),
-                      backgroundColor:
-                          isDark ? AppTheme.cardDark : Colors.white,
-                      foregroundColor: AppTheme.primaryTeal,
-                      child: const Icon(Icons.my_location),
+                    // Add Charger & Recenter Actions
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FloatingActionButton.extended(
+                          heroTag: 'add_station_fab',
+                          onPressed: () => SubmitStationSheet.show(context),
+                          backgroundColor: AppTheme.primaryTeal,
+                          foregroundColor: Colors.white,
+                          icon: const Icon(Icons.add_location_alt, size: 16),
+                          label: const Text('Add Charger', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 8),
+                        FloatingActionButton.small(
+                          heroTag: 'recenter_map_fab',
+                          onPressed: () => _centerMap(_kDefaultCenter),
+                          backgroundColor: isDark ? AppTheme.cardDark : Colors.white,
+                          foregroundColor: AppTheme.primaryTeal,
+                          child: const Icon(Icons.my_location),
+                        ),
+                      ],
                     ),
                   ],
                 ),
