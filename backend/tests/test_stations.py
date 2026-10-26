@@ -8,20 +8,20 @@ from httpx import AsyncClient
 
 @pytest.mark.asyncio
 async def test_seed_sample_stations_and_idempotency(async_client: AsyncClient) -> None:
-    """Verify that seeding inserts 6 stations and subsequent calls are idempotent."""
+    """Verify that seeding inserts 12 stations and subsequent calls are idempotent."""
     # First seed invocation
     first_res = await async_client.post("/api/v1/stations/seed-sample")
     assert first_res.status_code == 201
     first_data = first_res.json()
-    assert first_data["inserted_count"] == 6
-    assert first_data["total_count"] == 6
+    assert first_data["inserted_count"] == 12
+    assert first_data["total_count"] == 12
 
     # Second seed invocation (should detect existing coordinates and not insert duplicates)
     second_res = await async_client.post("/api/v1/stations/seed-sample")
     assert second_res.status_code == 201
     second_data = second_res.json()
     assert second_data["inserted_count"] == 0
-    assert second_data["total_count"] == 6
+    assert second_data["total_count"] == 12
 
 
 @pytest.mark.asyncio
@@ -32,7 +32,7 @@ async def test_list_stations_unfiltered(async_client: AsyncClient) -> None:
     response = await async_client.get("/api/v1/stations")
     assert response.status_code == 200
     stations = response.json()
-    assert len(stations) == 6
+    assert len(stations) == 12
 
 
 @pytest.mark.asyncio
@@ -103,7 +103,7 @@ async def test_list_stations_connector_type_filter(async_client: AsyncClient) ->
     # All seeded stations include CCS2
     ccs2_res = await async_client.get("/api/v1/stations", params={"connector_type": "CCS2"})
     assert ccs2_res.status_code == 200
-    assert len(ccs2_res.json()) == 6
+    assert len(ccs2_res.json()) == 12
 
 
 @pytest.mark.asyncio
@@ -111,12 +111,12 @@ async def test_list_stations_power_filter(async_client: AsyncClient) -> None:
     """Verify filtering stations by minimum power output in kW."""
     await async_client.post("/api/v1/stations/seed-sample")
 
-    # Stations with at least 180kW DC chargers (Suria KLCC and Tapah RSA)
+    # Stations with at least 180kW DC chargers (Suria KLCC, Tapah RSA, Seremban RSA)
     response = await async_client.get("/api/v1/stations", params={"min_kw": 180.0})
     assert response.status_code == 200
     stations = response.json()
 
-    assert len(stations) == 2
+    assert len(stations) == 3
     for station in stations:
         assert station["max_power_kw"] >= 180.0
 
@@ -126,12 +126,14 @@ async def test_list_stations_amenity_filter(async_client: AsyncClient) -> None:
     """Verify filtering stations by nearby facility amenity tags."""
     await async_client.post("/api/v1/stations/seed-sample")
 
-    # Only Tapah RSA includes "Petrol Station" amenity
+    # Tapah RSA and Seremban RSA include "Petrol Station" amenity
     petrol_res = await async_client.get("/api/v1/stations", params={"amenity": "Petrol Station"})
     assert petrol_res.status_code == 200
     petrol_stations = petrol_res.json()
-    assert len(petrol_stations) == 1
-    assert petrol_stations[0]["name"] == "Shell Recharge Tapah RSA Northbound"
+    assert len(petrol_stations) == 2
+    names = {s["name"] for s in petrol_stations}
+    assert "Shell Recharge Tapah RSA Northbound" in names
+    assert "Shell Recharge Seremban RSA Southbound" in names
 
     # Multiple stations have "Dining"
     dining_res = await async_client.get("/api/v1/stations", params={"amenity": "Dining"})
@@ -148,7 +150,7 @@ async def test_list_stations_24_hours_filter(async_client: AsyncClient) -> None:
     assert response.status_code == 200
     stations = response.json()
 
-    assert len(stations) == 3
+    assert len(stations) == 6
     for station in stations:
         assert station["is_24_hours"] is True
 

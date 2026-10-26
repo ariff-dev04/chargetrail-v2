@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/config/map_tile_config.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/features/stations/presentation/widgets/station_detail_sheet.dart';
 import 'package:latlong2/latlong.dart';
@@ -9,7 +10,7 @@ import '../domain/route_models.dart';
 import 'route_controller.dart';
 import 'widgets/route_telemetry_card.dart';
 
-/// Main interactive EV Route Planner screen with OSRM polylines and charging stops.
+/// Main interactive EV Route Planner screen with OSRM polylines, map styles, and charging stops.
 class RoutePlannerScreen extends ConsumerStatefulWidget {
   const RoutePlannerScreen({super.key});
 
@@ -26,6 +27,7 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(routeControllerProvider);
     final notifier = ref.read(routeControllerProvider.notifier);
+    final mapStyle = ref.watch(mapTileStyleProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final plan = state.currentPlan;
 
@@ -43,7 +45,7 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: mapStyle.urlTemplate,
                 userAgentPackageName: 'com.chargetrail.v2',
               ),
               if (plan != null && plan.polylinePoints.isNotEmpty) ...[
@@ -120,6 +122,14 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Route & Battery Simulation', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          const MapStyleSelectorButton(),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
                       _buildEndpointSelector(context, state, notifier),
                       const SizedBox(height: 8),
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/config/map_tile_config.dart';
+import 'package:frontend/core/services/location_service.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:latlong2/latlong.dart';
 import '../../community/presentation/submit_station_sheet.dart';
@@ -9,7 +11,7 @@ import 'station_controller.dart';
 import 'widgets/station_detail_sheet.dart';
 import 'widgets/station_filter_bar.dart';
 
-/// Main EV Charging Station map discovery view powered by OpenStreetMap tiles.
+/// Main EV Charging Station map discovery view with map styles and GPS location.
 class MapDiscoveryScreen extends ConsumerStatefulWidget {
   const MapDiscoveryScreen({super.key});
 
@@ -20,23 +22,38 @@ class MapDiscoveryScreen extends ConsumerStatefulWidget {
 class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
   final MapController _mapController = MapController();
 
-  // Default coordinate center: Kuala Lumpur City Centre
   static const LatLng _kDefaultCenter = LatLng(3.1578, 101.7118);
 
-  void _centerMap(LatLng target) {
-    _mapController.move(target, 14.0);
+  void _centerMap(LatLng target, [double zoom = 14.0]) {
+    _mapController.move(target, zoom);
+  }
+
+  Future<void> _handleMyLocation() async {
+    final loc = await LocationService().determinePosition();
+    ref.read(userLocationProvider.notifier).setLocation(loc);
+    _centerMap(loc.latLng, 14.5);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Located GPS: ${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)} (${loc.label})'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(stationControllerProvider);
     final notifier = ref.read(stationControllerProvider.notifier);
+    final mapStyle = ref.watch(mapTileStyleProvider);
+    final userLoc = ref.watch(userLocationProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       body: Stack(
         children: [
-          // 1. OpenStreetMap Pure Dart Map Layer
+          // 1. Pure Dart Map Layer (CartoDB/Esri Raster Tiles)
           FlutterMap(
             mapController: _mapController,
             options: const MapOptions(
@@ -47,79 +64,80 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: mapStyle.urlTemplate,
                 userAgentPackageName: 'com.chargetrail.v2',
               ),
               MarkerLayer(
-                markers: state.filteredStations.map((station) {
-                  final isSelected = state.selectedStation?.id == station.id;
-                  final isUltraFast = station.maxPowerKw >= 120.0;
-
-                  return Marker(
-                    point: LatLng(station.latitude, station.longitude),
-                    width: isSelected ? 52 : 44,
-                    height: isSelected ? 52 : 44,
-                    child: GestureDetector(
-                      onTap: () {
-                        notifier.selectStation(station);
-                        StationDetailSheet.show(context, station);
-                      },
-                      child: _buildMarkerIcon(isUltraFast, isSelected),
+                markers: [
+                  // User GPS Location Pulsing Marker
+                  if (userLoc != null)
+                    Marker(
+                      point: userLoc.latLng,
+                      width: 34,
+                      height: 34,
+                      child: const UserLocationMarkerWidget(),
                     ),
-                  );
-                }).toList(),
+                  // Station Markers
+                  ...state.filteredStations.map((station) {
+                    final isSelected = state.selectedStation?.id == station.id;
+                    final isUltraFast = station.maxPowerKw >= 120.0;
+
+                    return Marker(
+                      point: LatLng(station.latitude, station.longitude),
+                      width: isSelected ? 48 : 40,
+                      height: isSelected ? 48 : 40,
+                      child: GestureDetector(
+                        onTap: () {
+                          notifier.selectStation(station);
+                          StationDetailSheet.show(context, station);
+                        },
+                        child: _buildMarkerIcon(isUltraFast, isSelected),
+                      ),
+                    );
+                  }),
+                ],
               ),
             ],
           ),
 
-          // 2. Top Floating Filter Bar Overlay & Offline Banner
+          // 2. Top Floating Filter Bar Overlay & Interactive Offline Banner
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Offline Failover Mode Banner
                     if (state.isOfflineMode) ...[
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.cloud_off, size: 16, color: Colors.white),
-                            SizedBox(width: 6),
-                            Text(
-                              'Offline Mode • Serving Cached Stations',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
+                      GestureDetector(
+                        onTap: () {
+                          notifier.loadStations();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Reconnecting to live server...'), duration: Duration(seconds: 1)),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B),
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.cloud_off, size: 14, color: Colors.white),
+                              SizedBox(width: 6),
+                              Text('Offline Mode • Tap to Reconnect', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                            ],
+                          ),
                         ),
                       ),
                     ],
-
-                    // Horizontal Filter Bar
                     StationFilterBar(
                       activeFilter: state.activeFilter,
                       onSearchChanged: notifier.setSearchQuery,
@@ -135,90 +153,65 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
             ),
           ),
 
-          // 3. Floating Bottom Controls & Station Counter Badge
+          // 3. Floating Bottom Controls: Counter, Map Style, Add Charger & GPS
           Positioned(
-            bottom: 24,
-            left: 16,
-            right: 16,
+            bottom: 20,
+            left: 14,
+            right: 14,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Station Count Pill
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                       decoration: BoxDecoration(
                         color: isDark ? AppTheme.cardDark : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 6)],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.ev_station,
-                            size: 16,
-                            color: AppTheme.primaryTeal,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${state.filteredStations.length} stations found',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          const Icon(Icons.ev_station, size: 15, color: AppTheme.primaryTeal),
+                          const SizedBox(width: 4),
+                          Text('${state.filteredStations.length} stations', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
-
-                    // Add Charger & Recenter Actions
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        const MapStyleSelectorButton(),
+                        const SizedBox(width: 6),
                         FloatingActionButton.extended(
                           heroTag: 'add_station_fab',
                           onPressed: () => SubmitStationSheet.show(context),
                           backgroundColor: AppTheme.primaryTeal,
                           foregroundColor: Colors.white,
-                          icon: const Icon(Icons.add_location_alt, size: 16),
-                          label: const Text('Add Charger', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          icon: const Icon(Icons.add_location_alt, size: 15),
+                          label: const Text('Add', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         FloatingActionButton.small(
-                          heroTag: 'recenter_map_fab',
-                          onPressed: () => _centerMap(_kDefaultCenter),
+                          heroTag: 'my_location_fab',
+                          onPressed: _handleMyLocation,
                           backgroundColor: isDark ? AppTheme.cardDark : Colors.white,
                           foregroundColor: AppTheme.primaryTeal,
-                          child: const Icon(Icons.my_location),
+                          child: const Icon(Icons.my_location, size: 18),
                         ),
                       ],
                     ),
                   ],
                 ),
-
-                // Selected Station Quick Preview Card
                 if (state.selectedStation != null) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   _buildQuickPreviewCard(
                     context,
                     state.selectedStation!,
                     isDark,
-                    () => StationDetailSheet.show(
-                      context,
-                      state.selectedStation!,
-                    ),
+                    () => StationDetailSheet.show(context, state.selectedStation!),
                   ),
                 ],
               ],
@@ -230,31 +223,16 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
   }
 
   Widget _buildMarkerIcon(bool isUltraFast, bool isSelected) {
-    final baseColor =
-        isUltraFast ? AppTheme.ultraFastColor : AppTheme.primaryTeal;
-
+    final baseColor = isUltraFast ? AppTheme.ultraFastColor : AppTheme.primaryTeal;
     return Container(
       decoration: BoxDecoration(
         color: baseColor,
         shape: BoxShape.circle,
-        border: Border.all(
-          color: isSelected ? Colors.amber : Colors.white,
-          width: isSelected ? 3.5 : 2.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        border: Border.all(color: isSelected ? Colors.amber : Colors.white, width: isSelected ? 3.0 : 1.8),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 5)],
       ),
       child: Center(
-        child: Icon(
-          isUltraFast ? Icons.bolt : Icons.ev_station,
-          color: Colors.white,
-          size: isSelected ? 26 : 22,
-        ),
+        child: Icon(isUltraFast ? Icons.bolt : Icons.ev_station, color: Colors.white, size: isSelected ? 24 : 20),
       ),
     );
   }
@@ -268,55 +246,33 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: isDark ? AppTheme.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8)],
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: AppTheme.primaryTeal.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
-                Icons.ev_station,
-                color: AppTheme.primaryTeal,
-                size: 24,
-              ),
+              child: const Icon(Icons.ev_station, color: AppTheme.primaryTeal, size: 20),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    station.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${station.operatorName ?? "Community"} • ${station.maxPowerKw.toInt()} kW',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
+                  Text(station.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text('${station.operatorName ?? "Community"} • ${station.maxPowerKw.toInt()} kW', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
+            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
           ],
         ),
       ),

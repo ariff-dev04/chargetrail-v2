@@ -14,6 +14,7 @@ from app.api.v1.health import router as health_router
 from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.database import engine
+from app.core.observability import RequestTimingMiddleware
 
 logger = logging.getLogger("chargetrail")
 settings = get_settings()
@@ -40,6 +41,9 @@ def create_application() -> FastAPI:
         redoc_url="/redoc",
         openapi_url=f"{settings.API_V1_STR}/openapi.json",
     )
+
+    # Register Observability Request Timing Middleware
+    app.add_middleware(RequestTimingMiddleware)
 
     # Configure Cross-Origin Resource Sharing (CORS)
     if settings.BACKEND_CORS_ORIGINS:

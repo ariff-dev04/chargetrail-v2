@@ -1,10 +1,14 @@
-"""Health check router providing service liveness and readiness probes."""
+"""Health check and observability telemetry endpoints."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.database import check_database_health
+from app.core.database import check_database_health, get_db_session
+from app.core.observability import observability_store
+from app.models.station import ChargingStation
 
 router = APIRouter(tags=["Health"])
 settings = get_settings()
@@ -21,6 +25,21 @@ class HealthResponse(BaseModel):
         default="not_checked",
         description="Database connectivity status",
         examples=["connected"],
+    )
+
+
+class SystemMetricsResponse(BaseModel):
+    """Schema for runtime observability telemetry and database station statistics."""
+
+    status: str = Field(default="healthy", description="System operational health")
+    uptime_seconds: float = Field(description="Server process uptime in seconds")
+    total_requests: int = Field(description="Total requests recorded by middleware")
+    average_latency_ms: float = Field(description="Average request processing duration in ms")
+    verified_stations_count: int = Field(description="Total verified stations in database")
+    pending_stations_count: int = Field(description="Total unverified community contributions")
+    architecture: str = Field(
+        default="3-Layer Clean Architecture (FastAPI + PostGIS/SQLite + Flutter Riverpod)",
+        description="Software architecture specification",
     )
 
 
@@ -54,4 +73,31 @@ async def get_readiness() -> HealthResponse:
         version=settings.VERSION,
         environment=settings.ENVIRONMENT,
         database=db_status,
+    )
+
+
+@router.get(
+    "/metrics",
+    response_model=SystemMetricsResponse,
+    summary="Retrieve system observability metrics and station inventory",
+)
+async def get_system_metrics(
+    session: AsyncSession = Depends(get_db_session),
+) -> SystemMetricsResponse:
+    """Retrieve runtime process telemetry, request latencies, and database inventory."""
+    result = await session.execute(
+        select(
+            func.count(ChargingStation.id).filter(ChargingStation.is_verified.is_(True)),
+            func.count(ChargingStation.id).filter(ChargingStation.is_verified.is_(False)),
+        )
+    )
+    verified_count, pending_count = result.one()
+
+    return SystemMetricsResponse(
+        status="healthy",
+        uptime_seconds=observability_store.uptime_seconds,
+        total_requests=observability_store.total_requests,
+        average_latency_ms=observability_store.average_latency_ms,
+        verified_stations_count=verified_count or 0,
+        pending_stations_count=pending_count or 0,
     )
