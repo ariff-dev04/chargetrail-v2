@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     OSRM_BASE_URL: str = "http://router.project-osrm.org"
     PHOTON_GEOCODE_URL: str = "https://photon.komoot.io/api"
 
+    # JWT Authentication Security
+    JWT_SECRET_KEY: str = "chargetrail_v2_development_super_secret_jwt_key_2026"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days for mobile sessions
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, value: Any) -> list[str]:

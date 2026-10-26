@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/features/stations/data/station_local_cache.dart';
 import 'package:frontend/features/stations/domain/station_model.dart';
@@ -147,9 +148,11 @@ void main() {
       final station = StationLocalCache.defaultMalaysianStations().first;
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: StationDetailSheet(station: station),
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: StationDetailSheet(station: station),
+            ),
           ),
         ),
       );

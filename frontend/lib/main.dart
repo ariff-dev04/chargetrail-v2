@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
+import 'features/auth/presentation/profile_screen.dart';
 import 'features/stations/presentation/map_discovery_screen.dart';
 
 void main() {
@@ -47,11 +48,7 @@ class _AppShellState extends State<AppShell> {
       subtitle: 'Corridor filtering & charging stops strategy (Module 6)',
       icon: Icons.alt_route,
     ),
-    _PlaceholderTab(
-      title: 'EV Garage & Community Profile',
-      subtitle: 'Vehicle specs, battery capacity & consensus stats (Module 3)',
-      icon: Icons.directions_car,
-    ),
+    ProfileScreen(),
   ];
 
   @override
@@ -80,9 +77,9 @@ class _AppShellState extends State<AppShell> {
             label: 'Route Planner',
           ),
           NavigationDestination(
-            icon: Icon(Icons.directions_car_outlined),
-            selectedIcon: Icon(Icons.directions_car),
-            label: 'EV Garage',
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile & Saved',
           ),
         ],
       ),

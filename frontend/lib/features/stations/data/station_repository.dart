@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:frontend/core/config/api_config.dart';
 import '../domain/station_model.dart';
 import 'station_local_cache.dart';
 
@@ -14,7 +15,7 @@ class StationRepository {
   })  : _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: baseUrl ?? 'http://localhost:8000',
+                baseUrl: baseUrl ?? ApiConfig.baseUrl,
                 connectTimeout: const Duration(seconds: 3),
                 receiveTimeout: const Duration(seconds: 3),
               ),

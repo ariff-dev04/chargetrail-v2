@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import '../../../auth/presentation/auth_controller.dart';
 import '../../domain/station_model.dart';
 
 /// Modal detail sheet showing tariffs, parking level, plugs, and access steps.
@@ -54,7 +56,7 @@ class StationDetailSheet extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Operator & Verification Header
+              // Operator, Verified & Bookmark Header
               Row(
                 children: [
                   Container(
@@ -65,11 +67,7 @@ class StationDetailSheet extends StatelessWidget {
                     ),
                     child: Text(
                       station.operatorName ?? 'Community Station',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryTeal,
-                      ),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal),
                     ),
                   ),
                   if (station.isVerified) ...[
@@ -79,6 +77,20 @@ class StationDetailSheet extends StatelessWidget {
                     const Text('Verified', style: TextStyle(fontSize: 12, color: Colors.blue)),
                   ],
                   const Spacer(),
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final user = ref.watch(authControllerProvider).currentUser;
+                      final isSaved = user?.isBookmarked(station.id) ?? false;
+                      return IconButton(
+                        icon: Icon(
+                          isSaved ? Icons.bookmark : Icons.bookmark_border,
+                          color: isSaved ? AppTheme.primaryTeal : Colors.grey,
+                          size: 22,
+                        ),
+                        onPressed: () => ref.read(authControllerProvider.notifier).toggleBookmark(station.id),
+                      );
+                    },
+                  ),
                   const Icon(Icons.star, size: 16, color: Colors.amber),
                   const SizedBox(width: 4),
                   Text(
@@ -126,29 +138,20 @@ class StationDetailSheet extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Tariff, Parking Fee & Parking Level Card
               _buildPricingCard(isDark),
               const SizedBox(height: 16),
 
-              // Plugs Breakdown
-              Text(
-                'Available Connectors',
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
+              Text('Available Connectors', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               _buildPlugs(isDark),
               const SizedBox(height: 16),
 
-              // Access Waypoint Steps
               if (station.howToAccess.isNotEmpty) ...[
                 Row(
                   children: [
                     const Icon(Icons.navigation, size: 18, color: AppTheme.primaryTeal),
                     const SizedBox(width: 6),
-                    Text(
-                      'How to Access Charger',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
+                    Text('How to Access Charger', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -156,12 +159,8 @@ class StationDetailSheet extends StatelessWidget {
                 const SizedBox(height: 16),
               ],
 
-              // Amenities Tags
               if (station.amenities.isNotEmpty) ...[
-                Text(
-                  'Nearby Amenities',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
+                Text('Nearby Amenities', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -177,7 +176,6 @@ class StationDetailSheet extends StatelessWidget {
                 const SizedBox(height: 16),
               ],
 
-              // Primary Navigation CTA
               FilledButton.icon(
                 onPressed: onNavigatePressed ?? () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.directions),
@@ -210,18 +208,14 @@ class StationDetailSheet extends StatelessWidget {
             children: [
               _infoCol(
                 'Charging Tariff',
-                station.chargingCostMyr > 0
-                    ? 'RM ${station.chargingCostMyr.toStringAsFixed(2)} / kWh'
-                    : 'Free Charging',
+                station.chargingCostMyr > 0 ? 'RM ${station.chargingCostMyr.toStringAsFixed(2)} / kWh' : 'Free Charging',
                 Icons.electric_bolt,
                 AppTheme.primaryTeal,
               ),
               const SizedBox(width: 16),
               _infoCol(
                 'Parking Fee',
-                station.parkingFeeMyr > 0
-                    ? 'RM ${station.parkingFeeMyr.toStringAsFixed(2)}'
-                    : 'Free Entry',
+                station.parkingFeeMyr > 0 ? 'RM ${station.parkingFeeMyr.toStringAsFixed(2)}' : 'Free Entry',
                 Icons.local_parking,
                 Colors.orange[700]!,
               ),
@@ -237,11 +231,7 @@ class StationDetailSheet extends StatelessWidget {
                 Expanded(
                   child: Text(
                     station.parkingLevel!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryTeal,
-                    ),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal),
                   ),
                 ),
               ],

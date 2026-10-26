@@ -56,8 +56,15 @@
 
 ---
 
-## 4. Verification Commands
-- **Backend Lint & Format:** `cd backend && ruff check . && ruff format --check .`
-- **Backend Tests:** `cd backend && pytest`
-- **Frontend Analyze:** `cd app && flutter analyze`
-- **Frontend Tests:** `cd app && flutter test`
+## 4. Verification Commands & Standard Operating Procedures (SOP)
+- **SOP 1 (Automated Backend Verification):**
+  - Lint & Format: `cd backend && ruff check . && ruff format --check .`
+  - Unit/Integration Tests: `cd backend && pytest`
+- **SOP 2 (Automated Frontend Verification):**
+  - Static Analysis: `cd frontend && flutter analyze`
+  - Widget & Unit Tests: `cd frontend && flutter test`
+- **SOP 2.5 (Live Human UAT Gate):**
+  - Run `powershell -ExecutionPolicy Bypass -File scripts/run_uat.ps1` to launch the live app on an Android Studio Emulator (AVD), physical phone over Wi-Fi, or desktop.
+  - Follow the verification checklist in `docs/UAT_GUIDE.md` to visually confirm map rendering, access guides, and profile/bookmark interactions before proceeding.
+- **SOP 3 (Git Commit & Gate Clearance):**
+  - Review `git status`, stage only modified/created files, write concise commits referencing the completed module.

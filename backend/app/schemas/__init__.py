@@ -9,13 +9,27 @@ from app.schemas.station import (
     StationFilterParams,
     StationRead,
 )
+from app.schemas.user import (
+    BookmarkToggleResponse,
+    TokenResponse,
+    UserLogin,
+    UserProfileRead,
+    UserProfileUpdate,
+    UserRegister,
+)
 
 __all__ = [
     "AccessStep",
+    "BookmarkToggleResponse",
     "PlugInfo",
     "SeedResponse",
     "StationBase",
     "StationCreate",
     "StationFilterParams",
     "StationRead",
+    "TokenResponse",
+    "UserLogin",
+    "UserProfileRead",
+    "UserProfileUpdate",
+    "UserRegister",
 ]
