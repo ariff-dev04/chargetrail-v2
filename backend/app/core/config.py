@@ -85,10 +85,23 @@ class Settings(BaseSettings):
                 return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
             return raw_url
 
-        return (
-            f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@"
-            f"{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-        )
+        if self._is_postgres_reachable():
+            return (
+                f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@"
+                f"{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+
+        return "sqlite+aiosqlite:///./chargetrail_local.db"
+
+    def _is_postgres_reachable(self) -> bool:
+        """Check if local PostgreSQL instance is reachable on port 5432."""
+        import socket
+
+        try:
+            with socket.create_connection((self.POSTGRES_HOST, self.POSTGRES_PORT), timeout=0.3):
+                return True
+        except (OSError, TimeoutError):
+            return False
 
 
 @lru_cache

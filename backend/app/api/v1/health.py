@@ -37,6 +37,10 @@ class SystemMetricsResponse(BaseModel):
     average_latency_ms: float = Field(description="Average request processing duration in ms")
     verified_stations_count: int = Field(description="Total verified stations in database")
     pending_stations_count: int = Field(description="Total unverified community contributions")
+    stations_by_source: dict[str, int] = Field(
+        default_factory=dict,
+        description="Breakdown of saved stations by dataset source tag",
+    )
     architecture: str = Field(
         default="3-Layer Clean Architecture (FastAPI + PostGIS/SQLite + Flutter Riverpod)",
         description="Software architecture specification",
@@ -93,6 +97,13 @@ async def get_system_metrics(
     )
     verified_count, pending_count = result.one()
 
+    source_results = await session.execute(
+        select(ChargingStation.source, func.count(ChargingStation.id)).group_by(
+            ChargingStation.source
+        )
+    )
+    stations_by_source = {row[0] or "community": row[1] for row in source_results.all()}
+
     return SystemMetricsResponse(
         status="healthy",
         uptime_seconds=observability_store.uptime_seconds,
@@ -100,4 +111,5 @@ async def get_system_metrics(
         average_latency_ms=observability_store.average_latency_ms,
         verified_stations_count=verified_count or 0,
         pending_stations_count=pending_count or 0,
+        stations_by_source=stations_by_source,
     )

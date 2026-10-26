@@ -21,11 +21,18 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+engine_kwargs: dict[str, object] = {
+    "echo": settings.DEBUG,
+    "future": True,
+}
+if "sqlite" in settings.async_database_url:
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    engine_kwargs["pool_pre_ping"] = True
+
 engine = create_async_engine(
     settings.async_database_url,
-    echo=settings.DEBUG,
-    future=True,
-    pool_pre_ping=True,
+    **engine_kwargs,
 )
 
 async_session_maker = async_sessionmaker(

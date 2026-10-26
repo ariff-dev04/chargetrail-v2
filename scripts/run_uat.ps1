@@ -2,9 +2,9 @@
 .SYNOPSIS
     One-Click Live User Acceptance Testing (UAT) Launcher for ChargeTrail v2.
 .DESCRIPTION
-    Boots backend server, seeds Malaysian EV stations, resolves host IPs, and launches Flutter.
+    Boots backend server, seeds Malaysian EV stations, configures ADB reverse tunnel, and launches Flutter.
 .PARAMETER Device
-    Target Flutter device (e.g., emulator-5554, chrome, windows, or Wi-Fi connected phone).
+    Target Flutter device (e.g., adb-R5CY10TW9RF-WiUVMM._adb-tls-connect._tcp, chrome, windows).
 .PARAMETER ApiUrl
     Optional explicit override for API_BASE_URL.
 #>
@@ -21,7 +21,26 @@ Write-Host " * ChargeTrail v2 - Live User Acceptance Testing (UAT) Launcher " -F
 Write-Host "==================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. Detect Host LAN/Wi-Fi IPv4 for Physical Devices
+# 1. Resolve ADB Executable Path
+$adbExe = $null
+$possibleAdbPaths = @(
+    "C:\ASSDK\platform-tools\adb.exe",
+    (Join-Path $env:LOCALAPPDATA "Android\Sdk\platform-tools\adb.exe"),
+    "adb"
+)
+foreach ($candidate in $possibleAdbPaths) {
+    if ($candidate -eq "adb") {
+        $found = Get-Command adb -ErrorAction SilentlyContinue
+        if ($found) { $adbExe = $found.Source; break }
+    } elseif (Test-Path $candidate) {
+        $adbExe = $candidate
+        break
+    }
+}
+if (-not $adbExe) { $adbExe = "adb" }
+Write-Host "UAT: Using ADB binary: $adbExe" -ForegroundColor DarkGray
+
+# 2. Detect Host LAN/Wi-Fi IPv4 for Physical Devices
 $localIp = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
     Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254*" } |
     Select-Object -ExpandProperty IPAddress -First 1)
@@ -29,7 +48,7 @@ if (-not $localIp) { $localIp = "127.0.0.1" }
 Write-Host "UAT: Host PC LAN/Wi-Fi IPv4: " -NoNewline
 Write-Host $localIp -ForegroundColor Yellow
 
-# 2. Check or Boot Backend Server on Port 8000
+# 3. Check or Boot Backend Server on Port 8000
 $portListening = $false
 try {
     $client = New-Object System.Net.Sockets.TcpClient
@@ -56,7 +75,7 @@ if ($portListening) {
     Write-Host "UAT: FastAPI server booted on http://0.0.0.0:8000" -ForegroundColor Green
 }
 
-# 3. Seed Verified Malaysian EV Stations
+# 4. Seed Verified Malaysian EV Stations
 try {
     $seedRes = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/stations/seed-sample" -TimeoutSec 4 -ErrorAction SilentlyContinue
     if ($seedRes) {
@@ -67,28 +86,43 @@ try {
     Write-Host "UAT: Database verified (seed stations present)." -ForegroundColor DarkGray
 }
 
-# 4. Detect or Select Target Device
+# 5. Detect or Select Target Device
 $frontendDir = Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..")) "frontend"
 Push-Location $frontendDir
 
 if (-not $Device) {
-    $deviceListing = & flutter devices 2>&1
-    Write-Host ""
-    Write-Host "UAT: Available Devices:" -ForegroundColor Cyan
-    $deviceListing | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
+    # Check for connected ADB physical or wireless devices first
+    try {
+        $adbOut = & $adbExe devices 2>$null
+        $adbLines = $adbOut -split "`r?`n"
+        foreach ($line in $adbLines) {
+            if ($line -match '^([^\s]+)\s+device$') {
+                $Device = $matches[1].Trim()
+                Write-Host "UAT: Auto-detected active Android device: $Device" -ForegroundColor Green
+                break
+            }
+        }
+    } catch {}
 
-    # Prefer active Android device/emulator, fallback to Chrome then Windows
-    if ($deviceListing -match 'emulator|android') {
-        $lines = $deviceListing -split "`r?`n"
-        foreach ($line in $lines) {
-            if ($line -match 'emulator' -or $line -match 'android') {
-                if ($line -match '([a-zA-Z0-9_\-\.:]+)\s+•\s+android') {
-                    $Device = $matches[1].Trim()
-                    break
+    if (-not $Device) {
+        $deviceListing = & flutter devices 2>&1
+        Write-Host ""
+        Write-Host "UAT: Available Devices:" -ForegroundColor Cyan
+        $deviceListing | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
+
+        if ($deviceListing -match 'emulator|android') {
+            $lines = $deviceListing -split "`r?`n"
+            foreach ($line in $lines) {
+                if ($line -match 'emulator' -or $line -match 'android') {
+                    if ($line -match '([a-zA-Z0-9_\-\.:]+)\s+•\s+android') {
+                        $Device = $matches[1].Trim()
+                        break
+                    }
                 }
             }
         }
     }
+
     if (-not $Device) {
         if ($deviceListing -match 'chrome') { $Device = "chrome" }
         elseif ($deviceListing -match 'windows') { $Device = "windows" }
@@ -96,9 +130,29 @@ if (-not $Device) {
     }
 }
 
-# 5. Resolve Smart Base URL
+# 6. Configure ADB Reverse Port Forwarding & Resolve Smart Base URL
+$adbReverseActive = $false
+if ($Device -ne "chrome" -and $Device -ne "windows") {
+    try {
+        if ($Device -match '^[a-zA-Z0-9_\-\.:]+$') {
+            & $adbExe -s $Device reverse tcp:8000 tcp:8000 2>$null
+            $revList = & $adbExe -s $Device reverse --list 2>$null
+        } else {
+            & $adbExe reverse tcp:8000 tcp:8000 2>$null
+            $revList = & $adbExe reverse --list 2>$null
+        }
+        if ($revList -match 'tcp:8000') {
+            $adbReverseActive = $true
+            Write-Host "UAT: ADB reverse tunnel active on port 8000" -ForegroundColor Green
+        }
+    } catch {}
+}
+
 if (-not $ApiUrl) {
-    if ($Device -match 'emulator') {
+    if ($adbReverseActive) {
+        $ApiUrl = "http://127.0.0.1:8000"
+        Write-Host "UAT: Using direct ADB reverse tunnel (bypasses Windows Firewall completely)" -ForegroundColor Green
+    } elseif ($Device -match 'emulator') {
         $ApiUrl = "http://10.0.2.2:8000"
     } elseif ($Device -match 'android|phone|device') {
         $ApiUrl = "http://" + $localIp + ":8000"
@@ -107,19 +161,13 @@ if (-not $ApiUrl) {
     }
 }
 
-# 5.1 Configure ADB reverse port forwarding for physical Android & emulators
-try {
-    & adb reverse tcp:8000 tcp:8000 2>$null
-    Write-Host "UAT: ADB reverse port 8000 established (bypasses Windows Firewall)" -ForegroundColor Green
-} catch {}
-
 Write-Host ""
 Write-Host "UAT: Target Device   : $Device" -ForegroundColor Green
 Write-Host "UAT: API Endpoint    : $ApiUrl" -ForegroundColor Green
 Write-Host "UAT: Launching Flutter application..." -ForegroundColor Cyan
 Write-Host ""
 
-# 6. Run Flutter App
+# 7. Run Flutter App
 flutter run -d $Device --dart-define=API_BASE_URL=$ApiUrl
 
 Pop-Location

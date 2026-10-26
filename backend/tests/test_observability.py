@@ -32,4 +32,5 @@ async def test_get_system_metrics_endpoint(async_client: AsyncClient) -> None:
     assert metrics["average_latency_ms"] >= 0.0
     assert metrics["verified_stations_count"] >= 12
     assert metrics["pending_stations_count"] == 0
+    assert "community" in metrics["stations_by_source"]
     assert "Clean Architecture" in metrics["architecture"]

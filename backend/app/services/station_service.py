@@ -119,7 +119,10 @@ class StationService:
         if existing:
             return self._entity_to_dto(existing)
 
-        created = await self.repository.create_station(station_in)
+        persisted_data = station_in.model_copy(
+            update={"is_verified": True, "source": station_in.source or "osm_live"}
+        )
+        created = await self.repository.create_station(persisted_data)
         return self._entity_to_dto(created)
 
     @staticmethod
