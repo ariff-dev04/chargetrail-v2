@@ -26,10 +26,7 @@ void main() {
     // Switch to Route Planner Tab
     await tester.tap(find.text('Route Planner'));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(
-      find.text('Corridor filtering & charging stops strategy (Module 6)'),
-      findsOneWidget,
-    );
+    expect(find.text('Starting Battery SoC:'), findsOneWidget);
 
     // Switch to EV Garage Tab
     await tester.tap(find.text('EV Garage'));

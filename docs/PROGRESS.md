@@ -3,8 +3,8 @@
 > **Agent Rule:** Both the Web Orchestrator Agent and Local Gemini CLI must read this file to determine current project state, and update this file whenever a module passes verification.
 
 ## 📊 Current Project State
-- **Last Completed Gate:** `Module 5 — Backend Route Planner, OSRM Polyline & Range Anxiety Engine` ✅
-- **Current Active Target:** `Module 6 — Flutter Route Planner UI, Interactive Polyline & Final Thesis Hardening` ⏳
+- **Last Completed Gate:** `Module 6 — Flutter Route Planner UI, Interactive Polyline & Final Thesis Hardening` ✅ (100% of Core Thesis Modules 0–6 Complete)
+- **Current Active Target:** `Module 7 — CI/CD Pipeline, Observability & Deployment Readiness` ⏳
 - **Repository:** `https://github.com/ariff-dev04/chargetrail-v2.git` (`main` branch)
 
 ---
@@ -111,8 +111,16 @@
   - `backend/app/api/v1/routing.py` & `router.py`: REST endpoints `GET /api/v1/routing/places` and `POST /api/v1/routing/plan`.
   - `backend/tests/test_routing.py`: 4 comprehensive test suites covering place search, short safe urban route, long highway trip requiring charging at Tapah RSA, and garage vehicle overrides.
 
-### [ ] Module 6: Flutter Route Planner UI, Interactive Polyline & Final Thesis Hardening (NEXT UP)
-- **Scope (`KF10`, `KF13`, `KF14`, `KF15`):** Interactive Route Planner screen in `frontend/` with origin/destination search inputs, battery SoC starting slider, polyline overlay on `flutter_map`, route timeline cards with charging stops, and charger replacement sheet.
+### [x] Module 6: Flutter Route Planner UI, Interactive Polyline & Final Thesis Hardening (COMPLETED)
+- **Status:** Verified (28/28 `pytest` passed, 0 `ruff` warnings, 27/27 `flutter test` passed, 0 `flutter analyze` issues, all files 23–325 lines).
+- **Delivered Artifacts (`KF10`, `KF13`, `KF14`, `KF15`):**
+  - `frontend/lib/features/routing/domain/route_models.dart`: Immutable models `PlaceSuggestion`, `ChargingStopRecommendation`, and `RoutePlanResult` with status evaluation properties.
+  - `frontend/lib/features/routing/data/route_repository.dart`: Dio client connecting to `/api/v1/routing` with deterministic offline physics & corridor stop fallback for KL <-> Putrajaya and KL <-> Penang.
+  - `frontend/lib/features/routing/presentation/route_controller.dart`: Riverpod `RouteNotifier` managing origin/destination selection, swap, battery SoC slider, and pre-computed flagship route on boot.
+  - `frontend/lib/features/routing/presentation/widgets/route_telemetry_card.dart`: Range anxiety status badge (color-coded emerald/amber/red), journey metrics overview, and interactive recommended charging stops timeline (tapping opens `StationDetailSheet`).
+  - `frontend/lib/features/routing/presentation/route_planner_screen.dart`: Interactive OpenStreetMap route map with `PolylineLayer`, endpoint markers, stop pins, starting SoC slider, and quick presets (`KL -> Putrajaya (Safe)` and `KL -> Penang (Needs Stop)`).
+  - `frontend/lib/main.dart`: Wired `RoutePlannerScreen` directly into Tab 2 (`Route Planner`) of the app navigation shell. All 4 navigation destinations (`Explore Map`, `Route Planner`, `EV Garage`, `Profile & Saved`) are fully live and interactive!
+  - `frontend/test/route_planner_test.dart`: Comprehensive unit and widget tests for route models, offline physics, notifier state, and planner screen UI.
 
-### [ ] Module 7: CI/CD Pipeline, Observability & Deployment Readiness
+### [ ] Module 7: CI/CD Pipeline, Observability & Deployment Readiness (NEXT UP)
 - **Scope:** GitHub Actions (`ruff`, `pytest`, `flutter analyze`, `flutter test`, Flutter Web build) + structured logging & Docker Compose production profile.
