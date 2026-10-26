@@ -1,0 +1,182 @@
+"""Comprehensive test suite for EV Charging Stations spatial queries, filters, and seeder."""
+
+import uuid
+
+import pytest
+from httpx import AsyncClient
+
+
+@pytest.mark.asyncio
+async def test_seed_sample_stations_and_idempotency(async_client: AsyncClient) -> None:
+    """Verify that seeding inserts 6 stations and subsequent calls are idempotent."""
+    # First seed invocation
+    first_res = await async_client.post("/api/v1/stations/seed-sample")
+    assert first_res.status_code == 201
+    first_data = first_res.json()
+    assert first_data["inserted_count"] == 6
+    assert first_data["total_count"] == 6
+
+    # Second seed invocation (should detect existing coordinates and not insert duplicates)
+    second_res = await async_client.post("/api/v1/stations/seed-sample")
+    assert second_res.status_code == 201
+    second_data = second_res.json()
+    assert second_data["inserted_count"] == 0
+    assert second_data["total_count"] == 6
+
+
+@pytest.mark.asyncio
+async def test_list_stations_unfiltered(async_client: AsyncClient) -> None:
+    """Verify listing stations without query filters returns all seeded stations."""
+    await async_client.post("/api/v1/stations/seed-sample")
+
+    response = await async_client.get("/api/v1/stations")
+    assert response.status_code == 200
+    stations = response.json()
+    assert len(stations) == 6
+
+
+@pytest.mark.asyncio
+async def test_list_stations_viewport_bounding_box(async_client: AsyncClient) -> None:
+    """Verify viewport bounding box query isolates stations within Klang Valley coordinates."""
+    await async_client.post("/api/v1/stations/seed-sample")
+
+    # Bounding box covering greater Kuala Lumpur / Selangor / Putrajaya region
+    params = {
+        "min_lat": 2.80,
+        "max_lat": 3.30,
+        "min_lng": 101.40,
+        "max_lng": 101.90,
+    }
+    response = await async_client.get("/api/v1/stations", params=params)
+    assert response.status_code == 200
+    stations = response.json()
+
+    station_names = {s["name"] for s in stations}
+    assert "Suria KLCC Gentari Charging Hub" in station_names
+    assert "IOI City Mall Putrajaya JomCharge" in station_names
+    assert "Sunway Pyramid chargEV Station" in station_names
+
+    # Ensure distant stations in Perak, Penang, and Johor are excluded
+    assert "Shell Recharge Tapah RSA Northbound" not in station_names
+    assert "Gurney Plaza Shell Recharge" not in station_names
+    assert "Mid Valley Southkey Gentari Hub" not in station_names
+
+
+@pytest.mark.asyncio
+async def test_list_stations_radius_proximity(async_client: AsyncClient) -> None:
+    """Verify proximity search calculates distance_km and orders results nearest first."""
+    await async_client.post("/api/v1/stations/seed-sample")
+
+    # Origin at Suria KLCC coordinates
+    params = {
+        "lat": 3.1578,
+        "lng": 101.7118,
+        "radius_km": 15.0,
+    }
+    response = await async_client.get("/api/v1/stations", params=params)
+    assert response.status_code == 200
+    stations = response.json()
+
+    assert len(stations) >= 1
+    # First station must be Suria KLCC with distance ~ 0 km
+    assert stations[0]["name"] == "Suria KLCC Gentari Charging Hub"
+    assert stations[0]["distance_km"] == 0.0
+
+    # Verify distances are populated and monotonically increasing
+    distances = [s["distance_km"] for s in stations]
+    assert all(d is not None for d in distances)
+    assert distances == sorted(distances)
+
+
+@pytest.mark.asyncio
+async def test_list_stations_connector_type_filter(async_client: AsyncClient) -> None:
+    """Verify filtering by connector type (CHAdeMO vs CCS2)."""
+    await async_client.post("/api/v1/stations/seed-sample")
+
+    # Only Mid Valley Southkey has a CHAdeMO plug
+    chademo_res = await async_client.get("/api/v1/stations", params={"connector_type": "CHAdeMO"})
+    assert chademo_res.status_code == 200
+    chademo_stations = chademo_res.json()
+    assert len(chademo_stations) == 1
+    assert chademo_stations[0]["name"] == "Mid Valley Southkey Gentari Hub"
+
+    # All seeded stations include CCS2
+    ccs2_res = await async_client.get("/api/v1/stations", params={"connector_type": "CCS2"})
+    assert ccs2_res.status_code == 200
+    assert len(ccs2_res.json()) == 6
+
+
+@pytest.mark.asyncio
+async def test_list_stations_power_filter(async_client: AsyncClient) -> None:
+    """Verify filtering stations by minimum power output in kW."""
+    await async_client.post("/api/v1/stations/seed-sample")
+
+    # Stations with at least 180kW DC chargers (Suria KLCC and Tapah RSA)
+    response = await async_client.get("/api/v1/stations", params={"min_kw": 180.0})
+    assert response.status_code == 200
+    stations = response.json()
+
+    assert len(stations) == 2
+    for station in stations:
+        assert station["max_power_kw"] >= 180.0
+
+
+@pytest.mark.asyncio
+async def test_list_stations_amenity_filter(async_client: AsyncClient) -> None:
+    """Verify filtering stations by nearby facility amenity tags."""
+    await async_client.post("/api/v1/stations/seed-sample")
+
+    # Only Tapah RSA includes "Petrol Station" amenity
+    petrol_res = await async_client.get("/api/v1/stations", params={"amenity": "Petrol Station"})
+    assert petrol_res.status_code == 200
+    petrol_stations = petrol_res.json()
+    assert len(petrol_stations) == 1
+    assert petrol_stations[0]["name"] == "Shell Recharge Tapah RSA Northbound"
+
+    # Multiple stations have "Dining"
+    dining_res = await async_client.get("/api/v1/stations", params={"amenity": "Dining"})
+    assert dining_res.status_code == 200
+    assert len(dining_res.json()) >= 4
+
+
+@pytest.mark.asyncio
+async def test_list_stations_24_hours_filter(async_client: AsyncClient) -> None:
+    """Verify filtering for stations operating 24 hours daily."""
+    await async_client.post("/api/v1/stations/seed-sample")
+
+    response = await async_client.get("/api/v1/stations", params={"is_24_hours": True})
+    assert response.status_code == 200
+    stations = response.json()
+
+    assert len(stations) == 3
+    for station in stations:
+        assert station["is_24_hours"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_station_by_id_and_not_found(async_client: AsyncClient) -> None:
+    """Verify retrieving station by ID returns detailed how_to_access steps and 404 for unknown ID."""
+    await async_client.post("/api/v1/stations/seed-sample")
+
+    # Fetch station list to obtain a valid UUID
+    list_res = await async_client.get("/api/v1/stations")
+    stations = list_res.json()
+    target_station = stations[0]
+    station_id = target_station["id"]
+
+    # Retrieve specific station by valid UUID
+    detail_res = await async_client.get(f"/api/v1/stations/{station_id}")
+    assert detail_res.status_code == 200
+    detail = detail_res.json()
+    assert detail["id"] == station_id
+    assert detail["name"] == target_station["name"]
+    assert "how_to_access" in detail
+    assert len(detail["how_to_access"]) >= 2
+    assert detail["how_to_access"][0]["step_number"] == 1
+    assert "instruction" in detail["how_to_access"][0]
+
+    # Query with non-existent UUID must return 404
+    non_existent_id = uuid.uuid4()
+    not_found_res = await async_client.get(f"/api/v1/stations/{non_existent_id}")
+    assert not_found_res.status_code == 404
+    assert "not found" in not_found_res.json()["detail"].lower()
