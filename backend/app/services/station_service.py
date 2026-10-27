@@ -109,6 +109,23 @@ class StationService:
             message=message,
         )
 
+    async def upsert_batch_stations(
+        self,
+        stations_in: list[StationCreate],
+    ) -> list[StationRead]:
+        """Batch upsert externally discovered OSM stations idempotently."""
+        if not stations_in:
+            return []
+        await self.repository.upsert_seed_stations(stations_in)
+        min_lat = min(s.latitude for s in stations_in) - 0.02
+        max_lat = max(s.latitude for s in stations_in) + 0.02
+        min_lng = min(s.longitude for s in stations_in) - 0.02
+        max_lng = max(s.longitude for s in stations_in) + 0.02
+        saved = await self.repository.list_stations(
+            StationFilterParams(min_lat=min_lat, min_lng=min_lng, max_lat=max_lat, max_lng=max_lng)
+        )
+        return [self._entity_to_dto(s) for s in saved]
+
     async def upsert_external_station(self, station_in: StationCreate) -> StationRead:
         """Idempotently upsert an externally discovered OSM or community station upon interaction."""
         existing = await self.repository.find_by_coordinates(

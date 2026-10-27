@@ -116,6 +116,27 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
                         height: 32,
                         child: const Icon(Icons.flag, color: Colors.red, size: 28),
                       ),
+                      // Corridor Vicinity Chargers (Compact Teal EV Pins)
+                      ...plan.corridorStations
+                          .where((cs) => !plan.recommendedStops.any((rs) => rs.station.id == cs.id))
+                          .map((station) {
+                        return Marker(
+                          point: LatLng(station.latitude, station.longitude),
+                          width: 26,
+                          height: 26,
+                          child: GestureDetector(
+                            onTap: () => StationDetailSheet.show(context, station),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryTeal.withValues(alpha: 0.85),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 1.5),
+                              ),
+                              child: const Icon(Icons.ev_station, color: Colors.white, size: 14),
+                            ),
+                          ),
+                        );
+                      }),
                       // Recommended Charging Stop Markers (Orange Lightning Bolt)
                       ...plan.recommendedStops.map((stop) {
                         return Marker(

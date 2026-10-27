@@ -62,6 +62,9 @@ class ChargingStopRecommendation {
   final double energyAddedKwh;
   final int estimatedChargeMinutes;
   final double estimatedCostMyr;
+  final double? corridorLat;
+  final double? corridorLng;
+  final List<ChargingStation> nearbyAlternatives;
 
   const ChargingStopRecommendation({
     required this.station,
@@ -72,9 +75,46 @@ class ChargingStopRecommendation {
     required this.energyAddedKwh,
     required this.estimatedChargeMinutes,
     required this.estimatedCostMyr,
+    this.corridorLat,
+    this.corridorLng,
+    this.nearbyAlternatives = const [],
   });
 
+  ChargingStopRecommendation copyWith({
+    ChargingStation? station,
+    double? distanceFromOriginKm,
+    double? detourDistanceKm,
+    int? arrivalSocPercent,
+    int? departureSocPercent,
+    double? energyAddedKwh,
+    int? estimatedChargeMinutes,
+    double? estimatedCostMyr,
+    double? corridorLat,
+    double? corridorLng,
+    List<ChargingStation>? nearbyAlternatives,
+  }) {
+    return ChargingStopRecommendation(
+      station: station ?? this.station,
+      distanceFromOriginKm: distanceFromOriginKm ?? this.distanceFromOriginKm,
+      detourDistanceKm: detourDistanceKm ?? this.detourDistanceKm,
+      arrivalSocPercent: arrivalSocPercent ?? this.arrivalSocPercent,
+      departureSocPercent: departureSocPercent ?? this.departureSocPercent,
+      energyAddedKwh: energyAddedKwh ?? this.energyAddedKwh,
+      estimatedChargeMinutes:
+          estimatedChargeMinutes ?? this.estimatedChargeMinutes,
+      estimatedCostMyr: estimatedCostMyr ?? this.estimatedCostMyr,
+      corridorLat: corridorLat ?? this.corridorLat,
+      corridorLng: corridorLng ?? this.corridorLng,
+      nearbyAlternatives: nearbyAlternatives ?? this.nearbyAlternatives,
+    );
+  }
+
   factory ChargingStopRecommendation.fromJson(Map<String, dynamic> json) {
+    final rawAlts = json['nearby_alternatives'] as List<dynamic>? ?? [];
+    final alternatives = rawAlts
+        .map((a) => ChargingStation.fromJson(a as Map<String, dynamic>))
+        .toList();
+
     return ChargingStopRecommendation(
       station: ChargingStation.fromJson(json['station'] as Map<String, dynamic>),
       distanceFromOriginKm:
@@ -88,6 +128,9 @@ class ChargingStopRecommendation {
           json['estimated_charge_minutes'] as int? ?? 20,
       estimatedCostMyr:
           (json['estimated_cost_myr'] as num?)?.toDouble() ?? 0.0,
+      corridorLat: (json['corridor_lat'] as num?)?.toDouble(),
+      corridorLng: (json['corridor_lng'] as num?)?.toDouble(),
+      nearbyAlternatives: alternatives,
     );
   }
 
@@ -100,6 +143,9 @@ class ChargingStopRecommendation {
         'energy_added_kwh': energyAddedKwh,
         'estimated_charge_minutes': estimatedChargeMinutes,
         'estimated_cost_myr': estimatedCostMyr,
+        'corridor_lat': corridorLat,
+        'corridor_lng': corridorLng,
+        'nearby_alternatives': nearbyAlternatives.map((a) => a.toJson()).toList(),
       };
 }
 
@@ -148,6 +194,49 @@ class RoutePlanResult {
   String get formattedDriveTime => formatDurationMinutes(estimatedDriveMinutes);
   String get formattedChargingTime => formatDurationMinutes(totalChargingMinutes);
   String get formattedTotalTripTime => formatDurationMinutes(totalTripMinutes);
+
+  RoutePlanResult copyWith({
+    String? originName,
+    String? destinationName,
+    double? totalDistanceKm,
+    int? estimatedDriveMinutes,
+    int? totalChargingMinutes,
+    int? totalTripMinutes,
+    int? startingSocPercent,
+    int? projectedDestinationSocWithoutCharging,
+    int? finalArrivalSocPercent,
+    double? totalEnergyKwh,
+    String? rangeAnxietyStatus,
+    String? statusSummary,
+    String? vehicleSummary,
+    List<LatLng>? polylinePoints,
+    List<ChargingStopRecommendation>? recommendedStops,
+    List<ChargingStation>? corridorStations,
+  }) {
+    return RoutePlanResult(
+      originName: originName ?? this.originName,
+      destinationName: destinationName ?? this.destinationName,
+      totalDistanceKm: totalDistanceKm ?? this.totalDistanceKm,
+      estimatedDriveMinutes:
+          estimatedDriveMinutes ?? this.estimatedDriveMinutes,
+      totalChargingMinutes:
+          totalChargingMinutes ?? this.totalChargingMinutes,
+      totalTripMinutes: totalTripMinutes ?? this.totalTripMinutes,
+      startingSocPercent: startingSocPercent ?? this.startingSocPercent,
+      projectedDestinationSocWithoutCharging:
+          projectedDestinationSocWithoutCharging ??
+              this.projectedDestinationSocWithoutCharging,
+      finalArrivalSocPercent:
+          finalArrivalSocPercent ?? this.finalArrivalSocPercent,
+      totalEnergyKwh: totalEnergyKwh ?? this.totalEnergyKwh,
+      rangeAnxietyStatus: rangeAnxietyStatus ?? this.rangeAnxietyStatus,
+      statusSummary: statusSummary ?? this.statusSummary,
+      vehicleSummary: vehicleSummary ?? this.vehicleSummary,
+      polylinePoints: polylinePoints ?? this.polylinePoints,
+      recommendedStops: recommendedStops ?? this.recommendedStops,
+      corridorStations: corridorStations ?? this.corridorStations,
+    );
+  }
 
   factory RoutePlanResult.fromJson(Map<String, dynamic> json) {
     final rawPoints = json['polyline_points'] as List<dynamic>? ?? [];

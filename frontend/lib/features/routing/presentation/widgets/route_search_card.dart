@@ -92,7 +92,7 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
       final gpsPlace = PlaceSuggestion(
-        name: '📍 Current Location (GPS)',
+        name: 'Current Location (GPS)',
         city: 'Current Location',
         state: 'Malaysia',
         latitude: pos.latitude,
@@ -305,7 +305,7 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
               icon: state.isLoading
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.search, size: 18),
-              label: Text(state.isLoading ? 'Calculating Route…' : '🔍 Plan EV Route', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              label: Text(state.isLoading ? 'Calculating Route…' : 'Plan EV Route', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryTeal,
                 foregroundColor: Colors.white,

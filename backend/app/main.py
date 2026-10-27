@@ -25,25 +25,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application startup and shutdown lifecycle events."""
     logger.info("Starting up %s v%s...", settings.PROJECT_NAME, settings.VERSION)
 
-    # Ensure all models are registered and create tables
-    from sqlalchemy import func, select
-
     import app.models  # noqa: F401
-    from app.core.database import Base, async_session_maker
-    from app.models.station import ChargingStation
-    from app.repositories.station_repository import StationRepository
-    from app.services.station_service import StationService
+    from app.core.database import Base
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    # Automatically seed the 12 baseline Malaysian stations if table is empty
-    async with async_session_maker() as session:
-        count_res = await session.execute(select(func.count(ChargingStation.id)))
-        if (count_res.scalar() or 0) == 0:
-            logger.info("Auto-seeding baseline Malaysian EV charging stations...")
-            service = StationService(StationRepository(session))
-            await service.seed_sample_stations()
 
     yield
     logger.info("Shutting down %s...", settings.PROJECT_NAME)

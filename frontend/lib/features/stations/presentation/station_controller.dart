@@ -116,6 +116,17 @@ class StationNotifier extends Notifier<StationState> {
         isLoading: false,
         isOfflineMode: result.isOffline,
       );
+
+      if (result.stations.isEmpty && !result.isOffline) {
+        scanOsmViewport(
+          centerLat: state.referenceLat,
+          centerLng: state.referenceLng,
+          minLat: minLat ?? (state.referenceLat - 0.15),
+          minLng: minLng ?? (state.referenceLng - 0.15),
+          maxLat: maxLat ?? (state.referenceLat + 0.15),
+          maxLng: maxLng ?? (state.referenceLng + 0.15),
+        );
+      }
     } catch (e) {
       final cached = await StationLocalCache().getCachedStations();
       final filtered = cached.where(state.activeFilter.matches).toList();
@@ -223,6 +234,7 @@ class StationNotifier extends Notifier<StationState> {
       );
 
       if (discovered.isNotEmpty) {
+        ref.read(stationRepositoryProvider).upsertBatch(discovered);
         final merged = [...state.allStations, ...discovered];
         final filtered = merged.where(state.activeFilter.matches).toList();
         state = state.copyWith(

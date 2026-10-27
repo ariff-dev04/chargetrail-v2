@@ -10,9 +10,16 @@ class NavigationLauncher {
     required PlaceSuggestion origin,
     required PlaceSuggestion destination,
   }) {
+    final originParam = origin.name.isNotEmpty
+        ? Uri.encodeComponent('${origin.name} (${origin.latitude},${origin.longitude})')
+        : '${origin.latitude},${origin.longitude}';
+    final destParam = destination.name.isNotEmpty
+        ? Uri.encodeComponent('${destination.name} (${destination.latitude},${destination.longitude})')
+        : '${destination.latitude},${destination.longitude}';
+
     final baseUrl =
-        'https://www.google.com/maps/dir/?api=1&origin=${origin.latitude},${origin.longitude}'
-        '&destination=${destination.latitude},${destination.longitude}&travelmode=driving';
+        'https://www.google.com/maps/dir/?api=1&origin=$originParam'
+        '&destination=$destParam&travelmode=driving';
 
     if (plan.recommendedStops.isEmpty) return baseUrl;
 
@@ -23,8 +30,18 @@ class NavigationLauncher {
     return '$baseUrl&waypoints=${Uri.encodeComponent(waypointsStr)}';
   }
 
-  /// Builds Google Maps single-destination directions URL.
-  static String buildGoogleMapsSingleUrl(double lat, double lng) {
+  /// Builds Google Maps single-destination directions URL with human-readable name.
+  static String buildGoogleMapsSingleUrl(
+    double lat,
+    double lng, {
+    String? stationName,
+    String? city,
+  }) {
+    if (stationName != null && stationName.isNotEmpty) {
+      final nameWithCity = city != null && city.isNotEmpty ? '$stationName, $city' : stationName;
+      final query = Uri.encodeComponent('$nameWithCity ($lat,$lng)');
+      return 'https://www.google.com/maps/dir/?api=1&destination=$query&travelmode=driving';
+    }
     return 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving';
   }
 
@@ -158,6 +175,7 @@ class NavigationLauncher {
     required String stationName,
     required double lat,
     required double lng,
+    String? city,
   }) {
     showModalBottomSheet<void>(
       context: context,
@@ -188,7 +206,7 @@ class NavigationLauncher {
                   subtitle: const Text('Turn-by-turn route to station', style: TextStyle(fontSize: 11)),
                   onTap: () {
                     Navigator.pop(ctx);
-                    launchNavigationUrl(context, buildGoogleMapsSingleUrl(lat, lng));
+                    launchNavigationUrl(context, buildGoogleMapsSingleUrl(lat, lng, stationName: stationName, city: city));
                   },
                 ),
                 ListTile(

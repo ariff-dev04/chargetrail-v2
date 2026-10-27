@@ -6,6 +6,7 @@ import 'package:frontend/features/routing/domain/route_models.dart';
 import 'package:frontend/features/routing/presentation/navigation_launcher.dart';
 import 'package:frontend/features/routing/presentation/route_controller.dart';
 import 'package:frontend/features/routing/presentation/route_planner_screen.dart';
+import 'package:frontend/features/routing/presentation/widgets/charging_stop_tile.dart';
 import 'package:frontend/features/routing/presentation/widgets/route_search_card.dart';
 import 'package:frontend/features/routing/presentation/widgets/route_telemetry_card.dart';
 import 'package:frontend/features/stations/domain/station_model.dart';
@@ -87,7 +88,40 @@ void main() {
 
       expect(plan.isCritical, isTrue);
       expect(plan.totalDistanceKm, greaterThan(300.0));
-      expect(plan.recommendedStops.first.station.name, contains('Tapah'));
+      expect(plan.recommendedStops.first.station.name, equals('TNB Electron Tapah R&R Northbound'));
+      expect(plan.corridorStations.every((s) => !s.name.toLowerCase().contains('southbound')), isTrue);
+      expect(plan.recommendedStops.first.corridorLat, isNotNull);
+      expect(plan.recommendedStops.first.nearbyAlternatives.isNotEmpty, isTrue);
+      expect(plan.recommendedStops.first.nearbyAlternatives.any((a) => a.name.contains('Simpang Pulai') || a.name.contains('Ipoh')), isTrue);
+    });
+
+    test('swapStopStation swaps stop to vicinity alternative and updates Google Maps waypoints', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(routeControllerProvider.notifier);
+      await notifier.calculateRoute();
+
+      final initialPlan = container.read(routeControllerProvider).currentPlan;
+      expect(initialPlan, isNotNull);
+      expect(initialPlan!.recommendedStops.isNotEmpty, isTrue);
+
+      final oldStop = initialPlan.recommendedStops.first;
+      expect(oldStop.nearbyAlternatives.isNotEmpty, isTrue);
+      final altStation = oldStop.nearbyAlternatives.first;
+
+      await notifier.swapStopStation(0, altStation);
+
+      final updatedPlan = container.read(routeControllerProvider).currentPlan!;
+      expect(updatedPlan.recommendedStops.first.station.id, equals(altStation.id));
+      expect(updatedPlan.recommendedStops.first.station.name, equals(altStation.name));
+
+      final googleMapsUrl = NavigationLauncher.buildGoogleMapsMultiStopUrl(
+        origin: container.read(routeControllerProvider).origin,
+        destination: container.read(routeControllerProvider).destination,
+        plan: updatedPlan,
+      );
+      expect(googleMapsUrl, contains('${altStation.latitude}%2C${altStation.longitude}'));
     });
 
     test('RouteRepository searchPlaces filters catalog and returns matches', () async {
@@ -247,7 +281,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.byType(RouteSearchCard), findsOneWidget);
-      expect(find.text('🔍 Plan EV Route'), findsOneWidget);
+      expect(find.text('Plan EV Route'), findsOneWidget);
       expect(find.byKey(const Key('collapsed_telemetry_bar')), findsOneWidget);
 
       // Expand Bottom Telemetry Card -> Top Search automatically collapses!
@@ -312,6 +346,69 @@ void main() {
 
       expect(find.byKey(const Key('collapsed_telemetry_bar')), findsOneWidget);
       expect(find.text('35.0 km • 28m'), findsOneWidget);
+    });
+
+    testWidgets('ChargingStopTile renders vicinity swap chip and opens bottom modal',
+        (tester) async {
+      const stopStation = ChargingStation(
+        id: 'stop-tapah',
+        name: 'TNB Electron Tapah R&R Northbound',
+        operatorName: 'TNB Electron',
+        address: 'PLUS Highway KM 332',
+        city: 'Tapah',
+        state: 'Perak',
+        latitude: 4.3138,
+        longitude: 101.2582,
+        maxPowerKw: 180,
+        isVerified: true,
+      );
+      const altStation = ChargingStation(
+        id: 'alt-simpang-pulai',
+        name: 'Shell Recharge Simpang Pulai Layby Northbound',
+        operatorName: 'Shell Recharge',
+        address: 'PLUS Highway KM 290.4',
+        city: 'Simpang Pulai',
+        state: 'Perak',
+        latitude: 4.5162,
+        longitude: 101.1458,
+        maxPowerKw: 180,
+        isVerified: true,
+      );
+
+      const stop = ChargingStopRecommendation(
+        station: stopStation,
+        distanceFromOriginKm: 152.0,
+        detourDistanceKm: 0.5,
+        arrivalSocPercent: 20,
+        departureSocPercent: 80,
+        energyAddedKwh: 36.0,
+        estimatedChargeMinutes: 18,
+        estimatedCostMyr: 57.60,
+        nearbyAlternatives: [altStation],
+      );
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: ChargingStopTile(
+                stopIndex: 0,
+                stop: stop,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byKey(const Key('swap_stop_button_0')), findsOneWidget);
+      expect(find.textContaining('Swap Stop (1 in vicinity)'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('swap_stop_button_0')));
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('Vicinity Chargers Along Corridor'), findsOneWidget);
+      expect(find.text('Prioritize Stop'), findsOneWidget);
     });
   });
 }

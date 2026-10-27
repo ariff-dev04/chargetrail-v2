@@ -11,6 +11,7 @@ from app.schemas.routing import (
     RoutePlanResponse,
 )
 from app.schemas.station import StationFilterParams, StationRead
+from app.services.osm_harvester_service import OsmHarvesterService
 from app.services.osrm_client import OsrmClient
 from app.services.station_service import StationService, haversine_distance_km
 
@@ -20,6 +21,24 @@ class _CorridorCandidate:
     station: StationRead
     dist: float
     detour: float
+
+
+def _is_directionally_compatible(
+    station_name: str, station_lat: float, origin_lat: float, dest_lat: float
+) -> bool:
+    """Filter out highway R&Rs on opposite bound or stations behind origin/beyond destination."""
+    name_lower = station_name.lower()
+    if dest_lat - origin_lat > 0.15:
+        if "southbound" in name_lower or "arah selatan" in name_lower:
+            return False
+        if station_lat < origin_lat - 0.05 or station_lat > dest_lat + 0.05:
+            return False
+    elif origin_lat - dest_lat > 0.15:
+        if "northbound" in name_lower or "arah utara" in name_lower:
+            return False
+        if station_lat > origin_lat + 0.05 or station_lat < dest_lat - 0.05:
+            return False
+    return True
 
 
 class RoutePlannerService:
@@ -66,7 +85,20 @@ class RoutePlannerService:
             points=points,
             connector=connector,
             max_radius_km=request.corridor_radius_km,
+            origin_lat=request.origin_lat,
+            dest_lat=request.destination_lat,
         )
+
+        if len(candidates) < 2 and points:
+            await OsmHarvesterService.harvest_route_corridor(self.station_repo, points)
+            candidates = await self._find_corridor_candidates(
+                points=points,
+                connector=connector,
+                max_radius_km=request.corridor_radius_km,
+                origin_lat=request.origin_lat,
+                dest_lat=request.destination_lat,
+            )
+
         corridor_stations = [c.station for c in candidates]
 
         # 5. Classify Range Anxiety Status (KF14)
@@ -88,24 +120,9 @@ class RoutePlannerService:
             max_dc_kw=max_dc_kw,
             projected_dest_soc=projected_dest_soc,
             status_code=status_code,
+            points=points,
+            preferred_stop_ids=request.preferred_stop_station_ids,
         )
-
-        # 7. Multi-Stop Road Geometry: Route through charging stops along the highway
-        if recommended_stops:
-            stop_waypoints = [
-                (stop.station.latitude, stop.station.longitude) for stop in recommended_stops
-            ]
-            multi_points, multi_dist_km, multi_drive_mins = await self.osrm_client.fetch_route(
-                origin_lat=request.origin_lat,
-                origin_lng=request.origin_lng,
-                dest_lat=request.destination_lat,
-                dest_lng=request.destination_lng,
-                waypoints=stop_waypoints,
-            )
-            if multi_points and len(multi_points) >= 2:
-                points = multi_points
-                total_dist_km = max(total_dist_km, multi_dist_km)
-                drive_mins = max(drive_mins, multi_drive_mins)
 
         return RoutePlanResponse(
             origin_name=request.origin_name,
@@ -159,6 +176,8 @@ class RoutePlannerService:
         points: list[LatLngPoint],
         connector: str,
         max_radius_km: float,
+        origin_lat: float,
+        dest_lat: float,
     ) -> list[_CorridorCandidate]:
         """Find verified stations supporting connector standard within corridor buffer."""
         all_stations = await self.station_repo.list_stations(
@@ -167,6 +186,8 @@ class RoutePlannerService:
         candidates: list[_CorridorCandidate] = []
 
         for entity in all_stations:
+            if not _is_directionally_compatible(entity.name, entity.latitude, origin_lat, dest_lat):
+                continue
             station_dto = StationService._entity_to_dto(entity)
             # Find minimum orthogonal distance from station to any polyline point
             detour_km = min(
@@ -245,6 +266,8 @@ class RoutePlannerService:
         max_dc_kw: float,
         projected_dest_soc: int,
         status_code: str,
+        points: list[LatLngPoint],
+        preferred_stop_ids: list[str] | None = None,
     ) -> tuple[list[ChargingStopRecommendation], int, int]:
         """Select optimal charging stop sequence along travel corridor (KF15)."""
         if status_code == "safe" or not candidates:
@@ -254,6 +277,7 @@ class RoutePlannerService:
         current_soc = starting_soc
         stops: list[ChargingStopRecommendation] = []
         total_charge_mins = 0
+        preferred_set = set(preferred_stop_ids or [])
 
         while True:
             # Check if remaining highway distance can reach destination with safety buffer
@@ -264,21 +288,46 @@ class RoutePlannerService:
                 final_soc = round(current_soc - soc_to_dest)
                 return stops, total_charge_mins, max(final_soc, 0)
 
-            # Max reachable distance before hitting safety reserve + 5% buffer
+            # Max reachable distance before hitting safety reserve
             max_safe_dist = current_km + (
-                (current_soc - (reserve_soc + 5)) / 100.0 * battery_kwh * 1000.0 / efficiency
+                (current_soc - reserve_soc) / 100.0 * battery_kwh * 1000.0 / efficiency
             )
 
-            # Find reachable corridor candidates ahead
-            reachable = [c for c in candidates if current_km < c.dist <= max_safe_dist]
+            # Find reachable corridor candidates ahead (avoid immediate departure stops if starting SoC healthy)
+            min_stop_dist = (
+                current_km + 25.0
+                if current_km == 0 and current_soc > reserve_soc + 10
+                else current_km
+            )
+            reachable = [c for c in candidates if min_stop_dist < c.dist <= max_safe_dist]
+            if not reachable:
+                reachable = [c for c in candidates if current_km < c.dist <= max_safe_dist]
             if not reachable:
                 # If tight, pick closest charger ahead
                 reachable = [c for c in candidates if c.dist > current_km]
             if not reachable:
                 break
 
-            # Choose best charger (preferring peak kW speed or furthest distance)
-            best = max(reachable, key=lambda c: (c.station.max_power_kw, c.dist))
+            # Prioritize preferred user-swapped station if reachable, else fastest charger
+            preferred = next((c for c in reachable if str(c.station.id) in preferred_set), None)
+            if not preferred and preferred_set:
+                extended_dist = current_km + (
+                    (current_soc - max(reserve_soc - 5, 5))
+                    / 100.0
+                    * battery_kwh
+                    * 1000.0
+                    / efficiency
+                )
+                preferred = next(
+                    (
+                        c
+                        for c in candidates
+                        if current_km < c.dist <= extended_dist
+                        and str(c.station.id) in preferred_set
+                    ),
+                    None,
+                )
+            best = preferred or max(reachable, key=lambda c: (c.station.max_power_kw, c.dist))
 
             leg_dist = best.dist - current_km
             leg_energy = (leg_dist * efficiency) / 1000.0
@@ -293,6 +342,21 @@ class RoutePlannerService:
             charge_mins = max(round((energy_added / (effective_kw * 0.85)) * 60), 12)
             cost_myr = round(energy_added * (best.station.charging_cost_myr or 1.40), 2)
 
+            # Find vicinity alternatives along corridor (within ±45km)
+            nearby_alts = [
+                c.station
+                for c in candidates
+                if abs(c.dist - best.dist) <= 45.0 and str(c.station.id) != str(best.station.id)
+            ][:4]
+
+            # Project coordinate onto nearest point on highway polyline
+            closest_p = min(
+                points,
+                key=lambda p: haversine_distance_km(
+                    p.latitude, p.longitude, best.station.latitude, best.station.longitude
+                ),
+            )
+
             stops.append(
                 ChargingStopRecommendation(
                     station=best.station,
@@ -303,6 +367,9 @@ class RoutePlannerService:
                     energy_added_kwh=round(energy_added, 1),
                     estimated_charge_minutes=charge_mins,
                     estimated_cost_myr=cost_myr,
+                    corridor_lat=closest_p.latitude,
+                    corridor_lng=closest_p.longitude,
+                    nearby_alternatives=nearby_alts,
                 )
             )
 

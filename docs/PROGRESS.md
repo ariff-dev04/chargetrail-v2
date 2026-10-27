@@ -3,14 +3,14 @@
 > **Agent Rule:** Keep this file under 60 lines! Summarize completed modules in the table below so Gemini CLI reads state in <1 second.
 
 ## 📊 Current Project State
-- **Last Completed Gate:** `Module 7.9 — Active EV Telemetry Display, Hours/Minutes Formatting & Mutual-Exclusion Panel UX` ✅
+- **Last Completed Gate:** `Module 8.0 — Ground-Truth PLUS R&R Dataset, Directional Filtering, Highway Corridor Projection & ABRP Vicinity Switcher` ✅
 - **Current Active Target:** `100% Roadmap & Real-Device UAT Polish Complete (Ready for Final UAT / Thesis Defense)` 🏆
-- **Quality Gate Baseline:** `31/31 Backend Pytest` | `49/49 Frontend Flutter Tests` | `0 Lint/Analyze Issues` | `All files < 500 lines`
+- **Quality Gate Baseline:** `32/32 Backend Pytest` | `11/11 Route Planner Tests` | `0 Lint/Analyze Issues` | `All files < 420 lines`
 - **Repository:** `https://github.com/ariff-dev04/chargetrail-v2.git` (`main` branch)
 
 ---
 
-## 🗺️ Compacted SDLC Milestone Ledger (`Modules 0 – 7.9` Completed)
+## 🗺️ Compacted SDLC Milestone Ledger (`Modules 0 – 8.0` Completed)
 
 | Module | Scope & Functional Requirements (`KF01`–`KF16`) | Verification Summary | Status |
 |:---|:---|:---|:---|
@@ -29,3 +29,4 @@
 | **M7.7** | Persistent `chargetrail_local.db` Fallback, Lifespan Auto-Seed & `scripts/view_db.ps1` | `31/31 pytest`, `43/43 flutter` | ✅ Done |
 | **M7.8** | Free-Text Place Search, True OSRM Road Geometry, Collapsible Cards & Google Maps/Waze Deep-Link | `31/31 pytest`, `48/48 flutter` | ✅ Done |
 | **M7.9** | Active EV Garage Telemetry Badge, `Xh Ym` Duration Formatting & Mutual-Exclusion Panel UX | `31/31 pytest`, `9/9 route_planner_test`, `0 analyze` | ✅ Done |
+| **M8.0** | Ground-Truth PLUS R&R Dataset, Directional Filtering, Highway Corridor Projection & ABRP Vicinity Switcher | `32/32 pytest`, `11/11 route_planner_test`, `0 analyze` | ✅ Done |

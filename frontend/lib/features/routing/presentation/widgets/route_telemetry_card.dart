@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../stations/presentation/widgets/station_detail_sheet.dart';
 import '../../../vehicles/data/vehicle_repository.dart';
 import '../../../vehicles/domain/vehicle_model.dart';
 import '../../../vehicles/presentation/vehicle_controller.dart';
 import '../../domain/route_models.dart';
 import '../navigation_launcher.dart';
+import 'charging_stop_tile.dart';
 
 /// Collapsible telemetry card presenting journey metrics, charging stops, and navigation links.
 class RouteTelemetryCard extends ConsumerStatefulWidget {
@@ -86,7 +86,7 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
         key: const Key('collapsed_telemetry_bar'),
         onTap: _toggle,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
             color: isDark ? AppTheme.cardDark : Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -112,16 +112,24 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                       overflow: TextOverflow.ellipsis,
                     ),
-                    Text(
-                      '🚗 ${vehicle.brand} ${vehicle.modelName}',
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        const Icon(Icons.directions_car, size: 12, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '${vehicle.brand} ${vehicle.modelName}',
+                            style: const TextStyle(fontSize: 10, color: Colors.grey),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              ElevatedButton(
+              ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryTeal,
                   foregroundColor: Colors.white,
@@ -135,7 +143,8 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
                   origin: _resolvedOrigin,
                   destination: _resolvedDestination,
                 ),
-                child: const Text('🚀 Start', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.navigation, size: 12),
+                label: const Text('Start', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 2),
               IconButton(
@@ -222,7 +231,7 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
                       SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          '🚀 Start Journey in Navigation App',
+                          'Start Journey in Navigation App',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -253,7 +262,7 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              '🚗 Active EV: ${vehicle.brand} ${vehicle.modelName} (${vehicle.batteryCapacityKwh.toStringAsFixed(0)} kWh • ${vehicle.connectorType} • ${vehicle.maxDcChargeKw.toStringAsFixed(0)}kW Max)',
+              'Active EV: ${vehicle.brand} ${vehicle.modelName} (${vehicle.batteryCapacityKwh.toStringAsFixed(0)} kWh • ${vehicle.connectorType} • ${vehicle.maxDcChargeKw.toStringAsFixed(0)}kW Max)',
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -271,15 +280,15 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
 
     if (widget.plan.isSafe) {
       col = AppTheme.successGreen;
-      label = '🟢 Safe';
+      label = 'Safe';
       icon = Icons.shield;
     } else if (widget.plan.isWarning) {
       col = Colors.orange[800]!;
-      label = '🟡 Tight Buffer';
+      label = 'Tight Buffer';
       icon = Icons.warning_amber_rounded;
     } else {
       col = const Color(0xFFDC2626);
-      label = '🔴 Stop Required';
+      label = 'Stop Required';
       icon = Icons.battery_alert;
     }
 
@@ -290,7 +299,14 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
           color: col.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(label, style: TextStyle(color: col, fontWeight: FontWeight.bold, fontSize: 11)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: col, size: 13),
+            const SizedBox(width: 4),
+            Text(label, style: TextStyle(color: col, fontWeight: FontWeight.bold, fontSize: 11)),
+          ],
+        ),
       );
     }
 
@@ -431,70 +447,9 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
         ),
         const SizedBox(height: 6),
         ...widget.plan.recommendedStops.asMap().entries.map((entry) {
-          final idx = entry.key + 1;
-          final stop = entry.value;
-
-          return Card(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => StationDetailSheet.show(context, stop.station),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 13,
-                      backgroundColor: AppTheme.ultraFastColor,
-                      child: Text('$idx', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            stop.station.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Arrive ${stop.arrivalSocPercent}% -> ${stop.departureSocPercent}% • ${formatDurationMinutes(stop.estimatedChargeMinutes)} (RM ${stop.estimatedCostMyr.toStringAsFixed(2)})',
-                            style: const TextStyle(fontSize: 10),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                      icon: const Icon(Icons.directions, color: AppTheme.primaryTeal, size: 20),
-                      tooltip: 'Navigate',
-                      onPressed: () => NavigationLauncher.showStopNavigationPicker(
-                        context,
-                        stationName: stop.station.name,
-                        lat: stop.station.latitude,
-                        lng: stop.station.longitude,
-                      ),
-                    ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                      icon: const Icon(Icons.info_outline, size: 18),
-                      tooltip: 'Access Guide',
-                      onPressed: () => StationDetailSheet.show(context, stop.station),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          return ChargingStopTile(
+            stopIndex: entry.key,
+            stop: entry.value,
           );
         }),
       ],

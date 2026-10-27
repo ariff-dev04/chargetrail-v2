@@ -5,13 +5,13 @@ import '../domain/station_model.dart';
 /// Local offline cache storing stations in SharedPreferences.
 /// Pre-seeded with 12 flagship Malaysian EV stations across Peninsular Malaysia.
 class StationLocalCache {
-  static const String _storageKey = 'chargetrail_cached_stations_v1';
+  static const String _storageKey = 'cached_stations_v3_osm_truth';
 
   final SharedPreferences? _prefs;
 
   StationLocalCache([this._prefs]);
 
-  /// Asynchronously retrieve cached stations or return default Malaysian dataset.
+  /// Asynchronously retrieve cached stations or return empty list (no synthetic defaults).
   Future<List<ChargingStation>> getCachedStations() async {
     try {
       final prefs = _prefs ?? await SharedPreferences.getInstance();
@@ -26,7 +26,7 @@ class StationLocalCache {
         }
       }
     } catch (_) {}
-    return defaultMalaysianStations();
+    return const [];
   }
 
   /// Persist retrieved stations to local storage for subsequent offline launches.
@@ -212,23 +212,65 @@ class StationLocalCache {
       ),
       _s(
         id: 'c3d4e5f6-a1b2-4c3d-0e4f-5a6b7c8d9e0f',
-        name: 'Shell Recharge Tapah RSA Northbound',
-        operator: 'Shell Recharge',
-        address: 'North-South Expressway KM 332.3 Northbound, 35000 Tapah, Perak',
+        name: 'TNB Electron Tapah R&R Northbound',
+        operator: 'TNB Electron',
+        address: 'Kawasan Rehat & Rawat Tapah (Arah Utara), Lebuhraya Utara-Selatan (PLUS)',
         city: 'Tapah',
         state: 'Perak',
-        lat: 4.1950,
-        lng: 101.2789,
+        lat: 4.3138,
+        lng: 101.2582,
         maxKw: 180.0,
         is24h: true,
         cost: 1.60,
         parking: 0.0,
-        level: 'Outdoor Rest Area, Bay 1-2',
+        level: 'R&R Northbound Dedicated EV Bay (Near Food Court)',
         plugs: const [PlugInfo(type: 'CCS2', powerKw: 180.0, count: 2)],
         amenities: const ['Dining', 'Restroom', 'Convenience Store', 'Surau', 'Petrol Station'],
         steps: const [
-          AccessStep(stepNumber: 1, instruction: 'Exit PLUS highway at Tapah RSA Northbound rest stop.'),
-          AccessStep(stepNumber: 2, instruction: "Pass the food court; bays are directly next to McDonald's drive-thru."),
+          AccessStep(stepNumber: 1, instruction: 'Exit PLUS highway at Tapah R&R Northbound rest stop.'),
+          AccessStep(stepNumber: 2, instruction: 'Pass the main food court; TNB Electron bays are adjacent to the main building.'),
+        ],
+      ),
+      _s(
+        id: 'c3d4e5f6-a1b2-4c3d-0e4f-5a6b7c8d9e10',
+        name: 'Shell Recharge Simpang Pulai Layby Northbound',
+        operator: 'Shell Recharge',
+        address: 'North-South Expressway KM 290.4 Northbound, 31300 Simpang Pulai, Perak',
+        city: 'Simpang Pulai',
+        state: 'Perak',
+        lat: 4.5162,
+        lng: 101.1458,
+        maxKw: 180.0,
+        is24h: true,
+        cost: 1.60,
+        parking: 0.0,
+        level: 'Layby Northbound ParkEasy HPC Bay',
+        plugs: const [PlugInfo(type: 'CCS2', powerKw: 180.0, count: 2)],
+        amenities: const ['Restroom', 'Petrol Station', 'Convenience Store'],
+        steps: const [
+          AccessStep(stepNumber: 1, instruction: 'Exit PLUS highway at Simpang Pulai Layby Northbound.'),
+          AccessStep(stepNumber: 2, instruction: 'ParkEasy Shell Recharge bays located next to the Shell station canopy.'),
+        ],
+      ),
+      _s(
+        id: 'c3d4e5f6-a1b2-4c3d-0e4f-5a6b7c8d9e11',
+        name: 'Shell Recharge Tapah R&R Southbound',
+        operator: 'Shell Recharge',
+        address: 'Kawasan Rehat & Rawat Tapah (Arah Selatan), Lebuhraya Utara-Selatan (PLUS)',
+        city: 'Tapah',
+        state: 'Perak',
+        lat: 4.3112,
+        lng: 101.2596,
+        maxKw: 180.0,
+        is24h: true,
+        cost: 1.60,
+        parking: 0.0,
+        level: 'R&R Southbound Shell ParkEasy Bay',
+        plugs: const [PlugInfo(type: 'CCS2', powerKw: 180.0, count: 2)],
+        amenities: const ['Dining', 'Restroom', 'Convenience Store', 'Surau', 'Petrol Station'],
+        steps: const [
+          AccessStep(stepNumber: 1, instruction: 'Exit PLUS highway at Tapah R&R Southbound rest stop.'),
+          AccessStep(stepNumber: 2, instruction: 'Chargers located near Shell petrol canopy and food court.'),
         ],
       ),
       _s(

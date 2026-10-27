@@ -88,18 +88,57 @@ async def test_long_highway_route_recommends_charging_stop(async_client: AsyncCl
     assert len(plan["recommended_stops"]) >= 1
 
     recommended_station_names = [s["station"]["name"] for s in plan["recommended_stops"]]
-    assert any("Tapah" in name for name in recommended_station_names)
+    assert "TNB Electron Tapah R&R Northbound" in recommended_station_names
+
+    # Verify no Southbound stations in corridor stations for Northbound travel
+    corridor_names = [s["name"] for s in plan["corridor_stations"]]
+    assert not any("southbound" in n.lower() or "arah selatan" in n.lower() for n in corridor_names)
 
     stop = plan["recommended_stops"][0]
     assert stop["arrival_soc_percent"] >= 5
     assert stop["departure_soc_percent"] >= 75
     assert stop["estimated_charge_minutes"] > 0
     assert stop["estimated_cost_myr"] > 0
+    assert stop["corridor_lat"] is not None
+    assert stop["corridor_lng"] is not None
+    assert len(stop["nearby_alternatives"]) >= 1
+    alt_names = [a["name"] for a in stop["nearby_alternatives"]]
+    assert any("Simpang Pulai" in n or "Ipoh" in n for n in alt_names)
 
     # Charging stops must ensure final arrival SoC satisfies safety buffer
     assert plan["final_arrival_soc_percent"] >= 15
     assert plan["total_charging_minutes"] > 0
     assert plan["total_trip_minutes"] > plan["estimated_drive_minutes"]
+
+
+@pytest.mark.asyncio
+async def test_route_planning_with_preferred_stop_station(async_client: AsyncClient) -> None:
+    """Verify specifying preferred_stop_station_ids prioritizes that station."""
+    await async_client.post("/api/v1/stations/seed-sample")
+    stations_res = await async_client.get("/api/v1/stations")
+    simpang_pulai = next(s for s in stations_res.json() if "Simpang Pulai" in s["name"])
+
+    payload = {
+        "origin_name": "Kuala Lumpur (KLCC)",
+        "origin_lat": 3.1578,
+        "origin_lng": 101.7118,
+        "destination_name": "Penang (Gurney Plaza)",
+        "destination_lat": 5.4372,
+        "destination_lng": 100.3096,
+        "starting_soc_percent": 55,
+        "battery_capacity_kwh": 60.48,
+        "efficiency_wh_per_km": 144.0,
+        "max_dc_charge_kw": 88.0,
+        "reserve_soc_percent": 15,
+        "corridor_radius_km": 25.0,
+        "preferred_stop_station_ids": [simpang_pulai["id"]],
+    }
+
+    res = await async_client.post("/api/v1/routing/plan", json=payload)
+    assert res.status_code == 200
+    plan = res.json()
+    assert len(plan["recommended_stops"]) >= 1
+    assert plan["recommended_stops"][0]["station"]["id"] == simpang_pulai["id"]
 
 
 @pytest.mark.asyncio

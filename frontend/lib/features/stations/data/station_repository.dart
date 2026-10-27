@@ -121,4 +121,32 @@ class StationRepository {
     }
     return station;
   }
+
+  /// Batch persist externally discovered OSM stations into backend database & cache.
+  Future<List<ChargingStation>> upsertBatch(List<ChargingStation> stations) async {
+    if (stations.isEmpty) return const [];
+    try {
+      final res = await _dio.post(
+        '/api/v1/stations/upsert-batch',
+        data: stations.map((s) => s.toJson()).toList(),
+      );
+      if (res.statusCode == 200 && res.data is List) {
+        final list = (res.data as List<dynamic>)
+            .map((item) => ChargingStation.fromJson(item as Map<String, dynamic>))
+            .toList();
+        await _localCache.saveStations(list);
+        return list;
+      }
+    } catch (_) {}
+
+    final cached = await _localCache.getCachedStations();
+    final merged = <ChargingStation>[...cached];
+    for (final s in stations) {
+      if (!merged.any((m) => m.id == s.id || m.name == s.name)) {
+        merged.add(s);
+      }
+    }
+    await _localCache.saveStations(merged);
+    return stations;
+  }
 }

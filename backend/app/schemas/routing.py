@@ -54,6 +54,10 @@ class RoutePlanRequest(BaseModel):
 
     # Corridor Search Envelope
     corridor_radius_km: float = Field(default=20.0, gt=1.0, le=100.0, examples=[20.0])
+    preferred_stop_station_ids: list[str] = Field(
+        default_factory=list,
+        description="Optional list of prioritized station IDs to choose for charging stops",
+    )
 
 
 class ChargingStopRecommendation(BaseModel):
@@ -70,6 +74,16 @@ class ChargingStopRecommendation(BaseModel):
     )
     estimated_cost_myr: float = Field(
         description="Estimated charging tariff cost in Malaysian Ringgit"
+    )
+    corridor_lat: float | None = Field(
+        default=None, description="Projected latitude coordinate onto highway corridor polyline"
+    )
+    corridor_lng: float | None = Field(
+        default=None, description="Projected longitude coordinate onto highway corridor polyline"
+    )
+    nearby_alternatives: list[StationRead] = Field(
+        default_factory=list,
+        description="Up to 4 directionally compatible vicinity charging stations along the route corridor",
     )
 
 

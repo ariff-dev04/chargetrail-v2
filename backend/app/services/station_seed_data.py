@@ -1,4 +1,4 @@
-"""Verified Malaysian EV charging station seed dataset (12 flagship locations)."""
+"""Verified Malaysian EV charging station seed dataset (14 flagship locations)."""
 
 from typing import Any
 
@@ -133,24 +133,66 @@ _RAW_STATIONS: list[dict[str, Any]] = [
         ],
     },
     {
-        "name": "Shell Recharge Tapah RSA Northbound",
-        "operator": "Shell Recharge",
-        "address": "North-South Expressway KM 332.3 Northbound, 35000 Tapah, Perak",
+        "name": "TNB Electron Tapah R&R Northbound",
+        "operator": "TNB Electron",
+        "address": "Kawasan Rehat & Rawat Tapah (Arah Utara), Lebuhraya Utara-Selatan (PLUS)",
         "city": "Tapah",
         "state": "Perak",
-        "lat": 4.1950,
-        "lng": 101.2789,
+        "lat": 4.3138,
+        "lng": 101.2582,
         "plugs": [("CCS2", 180.0, 2)],
         "max_kw": 180.0,
         "is_24h": True,
         "hours": "24 Hours",
         "cost": 1.60,
         "parking": 0.0,
-        "level": "Outdoor Rest Area, Bay 1-2",
+        "level": "R&R Northbound Dedicated EV Bay (Near Food Court)",
         "amenities": ["Dining", "Restroom", "Convenience Store", "Surau", "Petrol Station"],
         "steps": [
-            "Exit PLUS highway at Tapah RSA Northbound rest stop.",
-            "Pass the food court; bays are directly next to McDonald's drive-thru.",
+            "Exit PLUS highway at Tapah R&R Northbound rest stop.",
+            "Pass the main food court; TNB Electron bays are adjacent to the main building.",
+        ],
+    },
+    {
+        "name": "Shell Recharge Simpang Pulai Layby Northbound",
+        "operator": "Shell Recharge",
+        "address": "North-South Expressway KM 290.4 Northbound, 31300 Simpang Pulai, Perak",
+        "city": "Simpang Pulai",
+        "state": "Perak",
+        "lat": 4.5162,
+        "lng": 101.1458,
+        "plugs": [("CCS2", 180.0, 2)],
+        "max_kw": 180.0,
+        "is_24h": True,
+        "hours": "24 Hours",
+        "cost": 1.60,
+        "parking": 0.0,
+        "level": "Layby Northbound ParkEasy HPC Bay",
+        "amenities": ["Restroom", "Petrol Station", "Convenience Store"],
+        "steps": [
+            "Exit PLUS highway at Simpang Pulai Layby Northbound.",
+            "ParkEasy Shell Recharge bays located next to the Shell station canopy.",
+        ],
+    },
+    {
+        "name": "Shell Recharge Tapah R&R Southbound",
+        "operator": "Shell Recharge",
+        "address": "Kawasan Rehat & Rawat Tapah (Arah Selatan), Lebuhraya Utara-Selatan (PLUS)",
+        "city": "Tapah",
+        "state": "Perak",
+        "lat": 4.3112,
+        "lng": 101.2596,
+        "plugs": [("CCS2", 180.0, 2)],
+        "max_kw": 180.0,
+        "is_24h": True,
+        "hours": "24 Hours",
+        "cost": 1.60,
+        "parking": 0.0,
+        "level": "R&R Southbound Shell ParkEasy Bay",
+        "amenities": ["Dining", "Restroom", "Convenience Store", "Surau", "Petrol Station"],
+        "steps": [
+            "Exit PLUS highway at Tapah R&R Southbound rest stop.",
+            "Chargers located near Shell petrol canopy and food court.",
         ],
     },
     {
@@ -262,7 +304,7 @@ _RAW_STATIONS: list[dict[str, Any]] = [
 
 
 def build_malaysian_seed_dataset() -> list[StationCreate]:
-    """Construct 12 verified Malaysian EV station locations across Peninsular Malaysia."""
+    """Construct 14 verified Malaysian EV station locations across Peninsular Malaysia."""
     stations: list[StationCreate] = []
     for item in _RAW_STATIONS:
         plugs = [PlugInfo(type=p[0], power_kw=p[1], count=p[2]) for p in item["plugs"]]

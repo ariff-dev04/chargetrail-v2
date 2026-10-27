@@ -1,117 +1,18 @@
-# ==============================================================================
-# Root .gitignore — ChargeTrail v2
-# ==============================================================================
-
-# ------------------------------------------------------------------------------
-# Environment & Secrets (NEVER commit credentials)
-# ------------------------------------------------------------------------------
-.env
-.env.*
-!.env.example
-
-# ------------------------------------------------------------------------------
-# Python Packaging Build Artifacts
-**/__pycache__/
+﻿# Python & Backend
+backend/.venv/
+__pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-.eggs/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Python Virtual Environments
-.venv/
-venv/
-ENV/
-env/
-env.bak/
-venv.bak/
-
-# Python Testing & Linting
-.cache
 .pytest_cache/
 .ruff_cache/
-.mypy_cache/
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-
-# ------------------------------------------------------------------------------
-# Flutter / Dart
-# ------------------------------------------------------------------------------
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-*.lock
-!pubspec.lock
-
-# Flutter Build Artifacts
-**/build/
-app/build/
-app/.dart_tool/
-app/.flutter-plugins
-app/.flutter-plugins-dependencies
-app/.metadata
-
-# Android Generated Files
-**/android/.gradle/
-**/android/local.properties
-**/android/**/build/
-**/android/**/*.keystore
-**/android/**/*.jks
-!**/android/app/proguard-rules.pro
-
-# iOS Generated Files
-**/ios/Pods/
-**/ios/.symlinks/
-**/ios/Flutter/Flutter.framework
-**/ios/Flutter/Flutter.podspec
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/app.framework
-**/ios/**/*.mode1v3
-**/ios/**/*.mode2v3
-**/ios/**/*.moved-aside
-**/ios/**/*.pbxuser
-**/ios/**/*.perspectivev3
-
-# ------------------------------------------------------------------------------
-# Database & Docker Local Volumes
-# ------------------------------------------------------------------------------
-postgres_data/
-postgis_data/
 *.db
-*.sqlite3
+*.db-journal
 
-# ------------------------------------------------------------------------------
-# IDE & System Files
-# ------------------------------------------------------------------------------
-.vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-Desktop.ini
+# Flutter & Android Build Artifacts (Prevent 25,000-file scan!)
+frontend/build/
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/local.properties
+frontend/windows/flutter/ephemeral/

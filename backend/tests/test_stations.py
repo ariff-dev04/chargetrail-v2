@@ -8,20 +8,20 @@ from httpx import AsyncClient
 
 @pytest.mark.asyncio
 async def test_seed_sample_stations_and_idempotency(async_client: AsyncClient) -> None:
-    """Verify that seeding inserts 12 stations and subsequent calls are idempotent."""
+    """Verify that seeding inserts 14 stations and subsequent calls are idempotent."""
     # First seed invocation
     first_res = await async_client.post("/api/v1/stations/seed-sample")
     assert first_res.status_code == 201
     first_data = first_res.json()
-    assert first_data["inserted_count"] == 12
-    assert first_data["total_count"] == 12
+    assert first_data["inserted_count"] == 14
+    assert first_data["total_count"] == 14
 
     # Second seed invocation (should detect existing coordinates and not insert duplicates)
     second_res = await async_client.post("/api/v1/stations/seed-sample")
     assert second_res.status_code == 201
     second_data = second_res.json()
     assert second_data["inserted_count"] == 0
-    assert second_data["total_count"] == 12
+    assert second_data["total_count"] == 14
 
 
 @pytest.mark.asyncio
@@ -32,7 +32,7 @@ async def test_list_stations_unfiltered(async_client: AsyncClient) -> None:
     response = await async_client.get("/api/v1/stations")
     assert response.status_code == 200
     stations = response.json()
-    assert len(stations) == 12
+    assert len(stations) == 14
 
 
 @pytest.mark.asyncio
@@ -57,7 +57,7 @@ async def test_list_stations_viewport_bounding_box(async_client: AsyncClient) ->
     assert "Sunway Pyramid chargEV Station" in station_names
 
     # Ensure distant stations in Perak, Penang, and Johor are excluded
-    assert "Shell Recharge Tapah RSA Northbound" not in station_names
+    assert "TNB Electron Tapah R&R Northbound" not in station_names
     assert "Gurney Plaza Shell Recharge" not in station_names
     assert "Mid Valley Southkey Gentari Hub" not in station_names
 
@@ -103,7 +103,7 @@ async def test_list_stations_connector_type_filter(async_client: AsyncClient) ->
     # All seeded stations include CCS2
     ccs2_res = await async_client.get("/api/v1/stations", params={"connector_type": "CCS2"})
     assert ccs2_res.status_code == 200
-    assert len(ccs2_res.json()) == 12
+    assert len(ccs2_res.json()) == 14
 
 
 @pytest.mark.asyncio
@@ -111,12 +111,12 @@ async def test_list_stations_power_filter(async_client: AsyncClient) -> None:
     """Verify filtering stations by minimum power output in kW."""
     await async_client.post("/api/v1/stations/seed-sample")
 
-    # Stations with at least 180kW DC chargers (Suria KLCC, Tapah RSA, Seremban RSA)
+    # Stations with at least 180kW DC chargers
     response = await async_client.get("/api/v1/stations", params={"min_kw": 180.0})
     assert response.status_code == 200
     stations = response.json()
 
-    assert len(stations) == 3
+    assert len(stations) == 5
     for station in stations:
         assert station["max_power_kw"] >= 180.0
 
@@ -126,13 +126,13 @@ async def test_list_stations_amenity_filter(async_client: AsyncClient) -> None:
     """Verify filtering stations by nearby facility amenity tags."""
     await async_client.post("/api/v1/stations/seed-sample")
 
-    # Tapah RSA and Seremban RSA include "Petrol Station" amenity
+    # Tapah R&R and Seremban RSA include "Petrol Station" amenity
     petrol_res = await async_client.get("/api/v1/stations", params={"amenity": "Petrol Station"})
     assert petrol_res.status_code == 200
     petrol_stations = petrol_res.json()
-    assert len(petrol_stations) == 2
+    assert len(petrol_stations) == 4
     names = {s["name"] for s in petrol_stations}
-    assert "Shell Recharge Tapah RSA Northbound" in names
+    assert "TNB Electron Tapah R&R Northbound" in names
     assert "Shell Recharge Seremban RSA Southbound" in names
 
     # Multiple stations have "Dining"
@@ -150,7 +150,7 @@ async def test_list_stations_24_hours_filter(async_client: AsyncClient) -> None:
     assert response.status_code == 200
     stations = response.json()
 
-    assert len(stations) == 6
+    assert len(stations) == 8
     for station in stations:
         assert station["is_24_hours"] is True
 
@@ -221,3 +221,77 @@ async def test_upsert_external_station_on_interaction(async_client: AsyncClient)
     assert second_res.status_code == 200
     second_station = second_res.json()
     assert second_station["id"] == station_id
+
+
+@pytest.mark.asyncio
+async def test_upsert_batch_stations(async_client: AsyncClient) -> None:
+    """Verify batch upsert persists multiple OSM stations and deduplicates."""
+    batch_payload = [
+        {
+            "name": "Klang Valley OSM Charger Alpha",
+            "operator_name": "OpenStreetMap Live",
+            "address": "Jalan Ampang, Kuala Lumpur",
+            "city": "Kuala Lumpur",
+            "state": "Kuala Lumpur",
+            "latitude": 3.1610,
+            "longitude": 101.7140,
+            "plug_types": [{"type": "CCS2", "power_kw": 60.0, "count": 2}],
+            "max_power_kw": 60.0,
+            "is_available": True,
+            "is_24_hours": True,
+            "charging_cost_myr": 1.40,
+            "parking_fee_myr": 0.0,
+            "parking_level": "Ground Bay",
+            "operation_hours": "24 Hours",
+            "amenities": ["Dining"],
+            "how_to_access": [{"step_number": 1, "instruction": "Direct street access."}],
+            "source": "osm_live",
+            "is_verified": True,
+        },
+        {
+            "name": "Klang Valley OSM Charger Beta",
+            "operator_name": "OpenStreetMap Live",
+            "address": "Jalan Sultan Ismail, Kuala Lumpur",
+            "city": "Kuala Lumpur",
+            "state": "Kuala Lumpur",
+            "latitude": 3.1550,
+            "longitude": 101.7080,
+            "plug_types": [{"type": "CCS2", "power_kw": 120.0, "count": 2}],
+            "max_power_kw": 120.0,
+            "is_available": True,
+            "is_24_hours": True,
+            "charging_cost_myr": 1.40,
+            "parking_fee_myr": 0.0,
+            "parking_level": "Basement 1",
+            "operation_hours": "24 Hours",
+            "amenities": ["Shopping"],
+            "how_to_access": [{"step_number": 1, "instruction": "Follow EV signs."}],
+            "source": "osm_live",
+            "is_verified": True,
+        },
+    ]
+
+    res = await async_client.post("/api/v1/stations/upsert-batch", json=batch_payload)
+    assert res.status_code == 200
+    saved = res.json()
+    assert len(saved) >= 2
+    names = [s["name"] for s in saved]
+    assert "Klang Valley OSM Charger Alpha" in names
+    assert "Klang Valley OSM Charger Beta" in names
+
+
+@pytest.mark.asyncio
+async def test_harvest_viewport_endpoint(async_client: AsyncClient) -> None:
+    """Verify live harvest viewport endpoint responds gracefully."""
+    req_payload = {
+        "min_lat": 3.10,
+        "min_lng": 101.65,
+        "max_lat": 3.20,
+        "max_lng": 101.75,
+        "center_lat": 3.15,
+        "center_lng": 101.70,
+    }
+    res = await async_client.post("/api/v1/stations/harvest-viewport", json=req_payload)
+    assert res.status_code == 200
+    assert isinstance(res.json(), list)
+

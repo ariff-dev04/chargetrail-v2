@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:frontend/core/config/api_config.dart';
 import 'package:latlong2/latlong.dart';
 import '../../stations/data/station_local_cache.dart';
+import '../../stations/domain/station_model.dart';
 import '../../vehicles/domain/vehicle_model.dart';
 import '../domain/route_models.dart';
 import 'malaysian_places_catalog.dart';
@@ -59,8 +60,8 @@ class RouteRepository {
           name: 'Tapah RSA (North-South Highway)',
           city: 'Tapah',
           state: 'Perak',
-          latitude: 4.1950,
-          longitude: 101.2789,
+          latitude: 4.3138,
+          longitude: 101.2582,
           category: 'highway_rsa',
         ),
         PlaceSuggestion(
@@ -168,12 +169,38 @@ class RouteRepository {
   /// Backwards-compatible alias for searchPlaces.
   Future<List<PlaceSuggestion>> fetchPlaces(String query) => searchPlaces(query);
 
+  bool _isDirectionallyCompatible(
+    String stationName,
+    double stationLat,
+    double originLat,
+    double destLat,
+  ) {
+    final lower = stationName.toLowerCase();
+    if (destLat - originLat > 0.15) {
+      if (lower.contains('southbound') || lower.contains('arah selatan')) {
+        return false;
+      }
+      if (stationLat < originLat - 0.05 || stationLat > destLat + 0.05) {
+        return false;
+      }
+    } else if (originLat - destLat > 0.15) {
+      if (lower.contains('northbound') || lower.contains('arah utara')) {
+        return false;
+      }
+      if (stationLat > originLat + 0.05 || stationLat < destLat - 0.05) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /// Calculate battery-aware route plan with live multi-stop OSRM road geometry.
   Future<RoutePlanResult> calculateRoutePlan({
     required PlaceSuggestion origin,
     required PlaceSuggestion destination,
     required VehicleProfile vehicle,
     required int startingSocPercent,
+    List<String> preferredStopStationIds = const [],
   }) async {
     final payload = {
       'origin_name': origin.name,
@@ -194,6 +221,7 @@ class RouteRepository {
       'connector_type': vehicle.connectorType,
       'reserve_soc_percent': vehicle.reserveSocPercent,
       'corridor_radius_km': 25.0,
+      'preferred_stop_station_ids': preferredStopStationIds,
     };
 
     try {
@@ -209,6 +237,7 @@ class RouteRepository {
       destination: destination,
       vehicle: vehicle,
       startingSoc: startingSocPercent,
+      preferredStopStationIds: preferredStopStationIds,
     );
   }
 
@@ -217,6 +246,7 @@ class RouteRepository {
     required PlaceSuggestion destination,
     required VehicleProfile vehicle,
     required int startingSoc,
+    List<String> preferredStopStationIds = const [],
   }) async {
     final straightDist = _haversineKm(
       origin.latitude,
@@ -239,6 +269,9 @@ class RouteRepository {
     final projectedDestSoc = (startingSoc - usedSoc).round();
 
     final allStations = StationLocalCache.defaultMalaysianStations();
+    final corridorStations = allStations
+        .where((s) => _isDirectionallyCompatible(s.name, s.latitude, origin.latitude, destination.latitude))
+        .toList();
     final stops = <ChargingStopRecommendation>[];
     int finalArrivalSoc = projectedDestSoc;
     String status = 'safe';
@@ -246,34 +279,61 @@ class RouteRepository {
         'Destination reachable safely with $projectedDestSoc% battery remaining.';
     int totalChargeMins = 0;
 
+    final polyline = roadPolyline ?? _synthesizeOfflinePolyline(origin, destination);
+
     if (projectedDestSoc < vehicle.reserveSocPercent) {
       status = 'critical_charging_required';
       summary =
           'Battery depletion risk: Route requires ${usedSoc.round()}% battery. Charging stop recommended.';
 
-      final tapahStation = allStations.firstWhere(
-        (s) => s.name.contains('Tapah'),
-        orElse: () => allStations.first,
-      );
+      ChargingStation chosenStation;
+      if (preferredStopStationIds.isNotEmpty) {
+        chosenStation = corridorStations.firstWhere(
+          (s) => preferredStopStationIds.contains(s.id),
+          orElse: () => corridorStations.firstWhere(
+            (s) => s.name.contains('Tapah'),
+            orElse: () => corridorStations.first,
+          ),
+        );
+      } else {
+        chosenStation = corridorStations.firstWhere(
+          (s) => s.name.contains('Tapah'),
+          orElse: () => corridorStations.first,
+        );
+      }
 
       final arrivalSoc = max((startingSoc - 35), 15);
       const departureSoc = 80;
       final addedKwh =
           ((departureSoc - arrivalSoc) / 100.0) * vehicle.batteryCapacityKwh;
-      final effectiveKw = min(tapahStation.maxPowerKw, vehicle.maxDcChargeKw);
+      final effectiveKw = min(chosenStation.maxPowerKw, vehicle.maxDcChargeKw);
       final chargeMins =
           max((addedKwh / (effectiveKw * 0.85) * 60).round(), 18);
 
+      final alternatives = corridorStations
+          .where((s) => s.id != chosenStation.id && (s.city == 'Tapah' || s.city == 'Simpang Pulai' || s.city == 'Ipoh'))
+          .take(4)
+          .toList();
+
+      final closestP = polyline.reduce((a, b) =>
+          _haversineKm(a.latitude, a.longitude, chosenStation.latitude, chosenStation.longitude) <
+                  _haversineKm(b.latitude, b.longitude, chosenStation.latitude, chosenStation.longitude)
+              ? a
+              : b);
+
       stops.add(
         ChargingStopRecommendation(
-          station: tapahStation,
+          station: chosenStation,
           distanceFromOriginKm: 152.0,
           detourDistanceKm: 0.5,
           arrivalSocPercent: arrivalSoc,
           departureSocPercent: departureSoc,
           energyAddedKwh: double.parse(addedKwh.toStringAsFixed(1)),
           estimatedChargeMinutes: chargeMins,
-          estimatedCostMyr: double.parse((addedKwh * 1.60).toStringAsFixed(2)),
+          estimatedCostMyr: double.parse((addedKwh * chosenStation.chargingCostMyr).toStringAsFixed(2)),
+          corridorLat: closestP.latitude,
+          corridorLng: closestP.longitude,
+          nearbyAlternatives: alternatives,
         ),
       );
       totalChargeMins += chargeMins;
@@ -287,23 +347,11 @@ class RouteRepository {
             .round(),
         20,
       );
-
-      // Re-query OSRM passing through the charging stop waypoint
-      final stopPolyline = await _fetchDirectOsrmPolyline([
-        LatLng(origin.latitude, origin.longitude),
-        LatLng(tapahStation.latitude, tapahStation.longitude),
-        LatLng(destination.latitude, destination.longitude),
-      ]);
-      if (stopPolyline != null && stopPolyline.isNotEmpty) {
-        roadPolyline = stopPolyline;
-      }
     } else if (projectedDestSoc < vehicle.reserveSocPercent + 10) {
       status = 'warning';
       summary =
           'Tight arrival battery ($projectedDestSoc% SoC). Approaching ${vehicle.reserveSocPercent}% safety reserve.';
     }
-
-    final polyline = roadPolyline ?? _synthesizeOfflinePolyline(origin, destination);
 
     return RoutePlanResult(
       originName: origin.name,
@@ -321,7 +369,7 @@ class RouteRepository {
       vehicleSummary: vehicle.displayName,
       polylinePoints: polyline,
       recommendedStops: stops,
-      corridorStations: allStations,
+      corridorStations: corridorStations,
     );
   }
 

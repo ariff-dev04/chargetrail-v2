@@ -1,12 +1,23 @@
 import 'dart:math';
 import 'package:dio/dio.dart';
 import '../domain/station_model.dart';
-import 'malaysia_ev_registry.dart';
 
-/// Multi-source open EV charging discovery engine combining Overpass API, Photon POIs, and Open Registry.
+/// Multi-source open EV charging discovery engine querying Overpass API and Photon POIs.
 class OsmOverpassService {
   final Dio _dio;
   static final Set<String> _scannedCellCache = {};
+
+  static const _mirrors = [
+    'https://lz4.overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass-api.de/api/interpreter',
+  ];
+
+  static const _osmHeaders = {
+    'Accept': '*/*',
+    'User-Agent': 'ChargeTrailV2/1.0 (https://github.com/ariff-dev04/chargetrail-v2)',
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
 
   OsmOverpassService({Dio? dio})
       : _dio = dio ??
@@ -36,7 +47,7 @@ class OsmOverpassService {
     );
   }
 
-  /// Execute 3-Tier Open Discovery Strategy for viewport center & bounds.
+  /// Execute Live OpenStreetMap & Photon discovery for viewport center & bounds.
   Future<List<ChargingStation>> fetchStationsInBounds({
     required double centerLat,
     required double centerLng,
@@ -60,100 +71,101 @@ class OsmOverpassService {
       return allKnown.any((s) {
         final dLat = (s.latitude - lat) * 111.0;
         final dLon = (s.longitude - lng) * 111.0 * cos(lat * pi / 180.0);
-        return sqrt(dLat * dLat + dLon * dLon) < 0.15;
+        return sqrt(dLat * dLat + dLon * dLon) < 0.12;
       });
     }
 
-    // --- Tier 1: Live Overpass API (Both Nodes & Ways around:15000m) ---
-    try {
-      final overpassQuery = '[out:json][timeout:6];'
-          '(node["amenity"="charging_station"](around:15000,$centerLat,$centerLng);'
-          'way["amenity"="charging_station"](around:15000,$centerLat,$centerLng););'
-          'out center 40;';
+    // --- Tier 1: Live Overpass API (Nodes & Ways with multi-mirror failover) ---
+    final overpassQuery = '[out:json][timeout:6];'
+        '(node["amenity"="charging_station"]($minLat,$minLng,$maxLat,$maxLng);'
+        'way["amenity"="charging_station"]($minLat,$minLng,$maxLat,$maxLng);'
+        'node["amenity"="charging_station"](around:15000,$centerLat,$centerLng););'
+        'out center 40;';
 
-      final res = await _dio.get(
-        'https://overpass-api.de/api/interpreter',
-        queryParameters: {'data': overpassQuery},
-      );
+    final body = 'data=${Uri.encodeQueryComponent(overpassQuery)}';
 
-      if (res.statusCode == 200 && res.data is Map<String, dynamic>) {
-        final elements = res.data['elements'] as List<dynamic>? ?? [];
-        for (final el in elements) {
-          final lat = (el['lat'] ?? el['center']?['lat'] as num?)?.toDouble() ?? 0.0;
-          final lon = (el['lon'] ?? el['center']?['lon'] as num?)?.toDouble() ?? 0.0;
-          if (lat != 0.0 && lon != 0.0 && !isTooClose(lat, lon)) {
-            final tags = el['tags'] as Map<String, dynamic>? ?? {};
-            final station = _parseOsmElement(el['id'].toString(), lat, lon, tags);
-            discovered.add(station);
-            allKnown.add(station);
-          }
-        }
-      }
-    } catch (_) {}
+    for (final mirror in _mirrors) {
+      try {
+        final res = await _dio.post(
+          mirror,
+          data: body,
+          options: Options(headers: _osmHeaders),
+        );
 
-    // --- Tier 2: Photon Open POI Search ---
-    try {
-      final res = await _dio.get(
-        'https://photon.komoot.io/api/',
-        queryParameters: {
-          'q': 'charging station',
-          'lat': centerLat,
-          'lon': centerLng,
-          'limit': 15,
-        },
-      );
-      if (res.statusCode == 200 && res.data is Map<String, dynamic>) {
-        final features = res.data['features'] as List<dynamic>? ?? [];
-        for (final f in features) {
-          final coords = f['geometry']?['coordinates'] as List<dynamic>? ?? [];
-          if (coords.length >= 2) {
-            final lon = (coords[0] as num).toDouble();
-            final lat = (coords[1] as num).toDouble();
-            if (lat >= 1.0 && lat <= 7.5 && lon >= 99.0 && lon <= 119.5 && !isTooClose(lat, lon)) {
-              final props = f['properties'] as Map<String, dynamic>? ?? {};
-              final name = props['name']?.toString() ?? 'EV Charger (Photon)';
-              final city = props['city']?.toString() ?? props['county']?.toString() ?? 'Malaysia';
-              final station = ChargingStation(
-                id: 'photon-${props['osm_id'] ?? DateTime.now().millisecondsSinceEpoch}',
-                name: name,
-                operatorName: 'Open POI Network',
-                address: '${props['street'] ?? name}, $city',
-                city: city,
-                state: props['state']?.toString() ?? 'Malaysia',
-                latitude: lat,
-                longitude: lon,
-                plugTypes: const [PlugInfo(type: 'CCS2', powerKw: 60.0, count: 2)],
-                maxPowerKw: 60.0,
-                isAvailable: true,
-                is24Hours: true,
-                chargingCostMyr: 1.40,
-                parkingFeeMyr: 0.0,
-                parkingLevel: 'Ground / Open Bay',
-                operationHours: '24 Hours',
-                amenities: const ['Convenience Store', 'Dining'],
-                howToAccess: const [
-                  AccessStep(stepNumber: 1, instruction: 'Located via open POI geographic index.'),
-                ],
-                rating: 4.5,
-                reviewCount: 4,
-                source: 'osm_live',
-                isVerified: false,
-              );
+        if (res.statusCode == 200 && res.data is Map<String, dynamic>) {
+          final elements = res.data['elements'] as List<dynamic>? ?? [];
+          for (final el in elements) {
+            final lat = (el['lat'] ?? el['center']?['lat'] as num?)?.toDouble() ?? 0.0;
+            final lon = (el['lon'] ?? el['center']?['lon'] as num?)?.toDouble() ?? 0.0;
+            if (lat >= 1.0 && lat <= 7.5 && lon >= 99.0 && lon <= 120.0 && !isTooClose(lat, lon)) {
+              final tags = el['tags'] as Map<String, dynamic>? ?? {};
+              final station = _parseOsmElement(el['id'].toString(), lat, lon, tags);
               discovered.add(station);
               allKnown.add(station);
             }
           }
+          if (discovered.isNotEmpty) break;
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
-    // --- Tier 3: Curated Regional Malaysia Open EV Registry ---
-    final regionalStations = MalaysiaEvRegistry.getStationsNear(centerLat, centerLng, radiusKm: 35.0);
-    for (final reg in regionalStations) {
-      if (!isTooClose(reg.latitude, reg.longitude)) {
-        discovered.add(reg);
-        allKnown.add(reg);
-      }
+    // --- Tier 2: Photon Open POI Search (Komoot live open index) ---
+    final queries = ['charging station', 'Gentari', 'JomCharge', 'TNB Electron'];
+    for (final q in queries) {
+      try {
+        final res = await _dio.get(
+          'https://photon.komoot.io/api/',
+          queryParameters: {
+            'q': q,
+            'lat': centerLat,
+            'lon': centerLng,
+            'limit': 10,
+          },
+        );
+        if (res.statusCode == 200 && res.data is Map<String, dynamic>) {
+          final features = res.data['features'] as List<dynamic>? ?? [];
+          for (final f in features) {
+            final coords = f['geometry']?['coordinates'] as List<dynamic>? ?? [];
+            if (coords.length >= 2) {
+              final lon = (coords[0] as num).toDouble();
+              final lat = (coords[1] as num).toDouble();
+              if (lat >= 1.0 && lat <= 7.5 && lon >= 99.0 && lon <= 120.0 && !isTooClose(lat, lon)) {
+                final props = f['properties'] as Map<String, dynamic>? ?? {};
+                final name = props['name']?.toString() ?? 'EV Charger (Photon)';
+                final city = props['city']?.toString() ?? props['county']?.toString() ?? 'Malaysia';
+                final station = ChargingStation(
+                  id: 'photon-${props['osm_id'] ?? DateTime.now().millisecondsSinceEpoch}_${discovered.length}',
+                  name: name,
+                  operatorName: 'Open POI Network',
+                  address: '${props['street'] ?? name}, $city',
+                  city: city,
+                  state: props['state']?.toString() ?? 'Malaysia',
+                  latitude: lat,
+                  longitude: lon,
+                  plugTypes: const [PlugInfo(type: 'CCS2', powerKw: 60.0, count: 2)],
+                  maxPowerKw: 60.0,
+                  isAvailable: true,
+                  is24Hours: true,
+                  chargingCostMyr: 1.40,
+                  parkingFeeMyr: 0.0,
+                  parkingLevel: 'Ground / Open Bay',
+                  operationHours: '24 Hours',
+                  amenities: const ['Convenience Store', 'Dining'],
+                  howToAccess: const [
+                    AccessStep(stepNumber: 1, instruction: 'Located via open POI geographic index.'),
+                  ],
+                  rating: 4.5,
+                  reviewCount: 4,
+                  source: 'osm_live',
+                  isVerified: true,
+                );
+                discovered.add(station);
+                allKnown.add(station);
+              }
+            }
+          }
+        }
+      } catch (_) {}
     }
 
     return discovered;
@@ -210,7 +222,7 @@ class OsmOverpassService {
       rating: 4.5,
       reviewCount: 3,
       source: 'osm_live',
-      isVerified: false,
+      isVerified: true,
     );
   }
 }
