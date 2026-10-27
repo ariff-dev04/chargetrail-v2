@@ -61,39 +61,53 @@ class RouteNotifier extends Notifier<RouteState> {
       isLoading: true,
     );
 
+    ref.listen<VehicleState>(vehicleControllerProvider, (prev, next) {
+      if (prev?.activeVehicle.id != next.activeVehicle.id ||
+          prev?.activeVehicle.batteryCapacityKwh != next.activeVehicle.batteryCapacityKwh ||
+          prev?.activeVehicle.efficiencyWhPerKm != next.activeVehicle.efficiencyWhPerKm ||
+          prev?.activeVehicle.maxDcChargeKw != next.activeVehicle.maxDcChargeKw) {
+        calculateRoute();
+      }
+    });
+
     Future.microtask(() => calculateRoute());
     return state;
   }
 
   /// Update departure origin landmark.
-  void setOrigin(PlaceSuggestion origin) {
+  void setOrigin(PlaceSuggestion origin, {bool recalculate = false}) {
     state = state.copyWith(origin: origin);
-    calculateRoute();
+    if (recalculate) calculateRoute();
   }
 
   /// Update arrival destination landmark.
-  void setDestination(PlaceSuggestion dest) {
+  void setDestination(PlaceSuggestion dest, {bool recalculate = false}) {
     state = state.copyWith(destination: dest);
-    calculateRoute();
+    if (recalculate) calculateRoute();
   }
 
   /// Swap origin and destination endpoints.
-  void swapOriginDestination() {
+  void swapOriginDestination({bool recalculate = false}) {
     final oldOrigin = state.origin;
     state = state.copyWith(
       origin: state.destination,
       destination: oldOrigin,
     );
-    calculateRoute();
+    if (recalculate) calculateRoute();
   }
 
   /// Update simulated battery State of Charge at departure.
-  void setStartingSoc(int soc) {
+  void setStartingSoc(int soc, {bool recalculate = false}) {
     state = state.copyWith(startingSocPercent: soc.clamp(10, 100));
-    calculateRoute();
+    if (recalculate) calculateRoute();
   }
 
-  /// Apply one-click route preset for rapid demonstration.
+  /// Search places via repository.
+  Future<List<PlaceSuggestion>> searchPlaces(String query) {
+    return ref.read(routeRepositoryProvider).searchPlaces(query);
+  }
+
+  /// Apply one-click route preset for rapid demonstration or testing.
   void applyPreset({
     required PlaceSuggestion origin,
     required PlaceSuggestion destination,

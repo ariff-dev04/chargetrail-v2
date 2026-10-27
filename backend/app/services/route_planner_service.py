@@ -90,6 +90,23 @@ class RoutePlannerService:
             status_code=status_code,
         )
 
+        # 7. Multi-Stop Road Geometry: Route through charging stops along the highway
+        if recommended_stops:
+            stop_waypoints = [
+                (stop.station.latitude, stop.station.longitude) for stop in recommended_stops
+            ]
+            multi_points, multi_dist_km, multi_drive_mins = await self.osrm_client.fetch_route(
+                origin_lat=request.origin_lat,
+                origin_lng=request.origin_lng,
+                dest_lat=request.destination_lat,
+                dest_lng=request.destination_lng,
+                waypoints=stop_waypoints,
+            )
+            if multi_points and len(multi_points) >= 2:
+                points = multi_points
+                total_dist_km = max(total_dist_km, multi_dist_km)
+                drive_mins = max(drive_mins, multi_drive_mins)
+
         return RoutePlanResponse(
             origin_name=request.origin_name,
             destination_name=request.destination_name,

@@ -1,6 +1,16 @@
 import 'package:latlong2/latlong.dart';
 import '../../stations/domain/station_model.dart';
 
+/// Formats minutes into human-friendly duration string (e.g. '45m', '2h', '8h 20m').
+String formatDurationMinutes(int minutes) {
+  if (minutes < 60) {
+    return '${minutes}m';
+  }
+  final hours = minutes ~/ 60;
+  final rem = minutes % 60;
+  return rem == 0 ? '${hours}h' : '${hours}h ${rem}m';
+}
+
 /// Geocoded place or highway interchange waypoint.
 class PlaceSuggestion {
   final String name;
@@ -134,6 +144,10 @@ class RoutePlanResult {
   bool get isSafe => rangeAnxietyStatus == 'safe';
   bool get isWarning => rangeAnxietyStatus == 'warning';
   bool get isCritical => rangeAnxietyStatus == 'critical_charging_required';
+
+  String get formattedDriveTime => formatDurationMinutes(estimatedDriveMinutes);
+  String get formattedChargingTime => formatDurationMinutes(totalChargingMinutes);
+  String get formattedTotalTripTime => formatDurationMinutes(totalTripMinutes);
 
   factory RoutePlanResult.fromJson(Map<String, dynamic> json) {
     final rawPoints = json['polyline_points'] as List<dynamic>? ?? [];

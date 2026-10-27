@@ -1,178 +1,31 @@
 # ChargeTrail v2 — Living SDLC Progress Tracker
 
-> **Agent Rule:** Both the Web Orchestrator Agent and Local Gemini CLI must read this file to determine current project state, and update this file whenever a module passes verification.
+> **Agent Rule:** Keep this file under 60 lines! Summarize completed modules in the table below so Gemini CLI reads state in <1 second.
 
 ## 📊 Current Project State
-- **Last Completed Gate:** `Module 7.7 — Persistent Local SQLite Fallback, Lifespan Auto-Seed & Live DB Inspector` ✅
-- **Project Completion Status:** `100% Complete & Production-Verified (Live SQLite Persistence, ADB Tunneling, & Open-Data Ecosystem)` 🏆
+- **Last Completed Gate:** `Module 7.9 — Active EV Telemetry Display, Hours/Minutes Formatting & Mutual-Exclusion Panel UX` ✅
+- **Current Active Target:** `100% Roadmap & Real-Device UAT Polish Complete (Ready for Final UAT / Thesis Defense)` 🏆
+- **Quality Gate Baseline:** `31/31 Backend Pytest` | `49/49 Frontend Flutter Tests` | `0 Lint/Analyze Issues` | `All files < 500 lines`
 - **Repository:** `https://github.com/ariff-dev04/chargetrail-v2.git` (`main` branch)
 
 ---
 
-## 🗺️ Modular SDLC Roadmap & Status
+## 🗺️ Compacted SDLC Milestone Ledger (`Modules 0 – 7.9` Completed)
 
-### [x] Module 0: Workspace & Infrastructure Base (COMPLETED)
-- **Status:** Verified & Pushed to `main` (4/4 `pytest` passed, 0 `ruff` warnings, all files < 100 lines).
-- **Delivered Artifacts:**
-  - Root `.gitignore`, `.env.example`, `docker-compose.yml` (`postgis/postgis:16-3.4`), `GEMINI.md`.
-  - `backend/app/core/config.py`, `backend/app/core/database.py`.
-  - `backend/app/api/v1/health.py`, `backend/app/api/v1/router.py`, `backend/app/main.py`.
-  - `backend/tests/test_health.py`, `backend/tests/conftest.py`, `backend/ruff.toml`.
-
-### [x] Module 1A: Backend Station Spatial Core, Filtering & Seeder (COMPLETED)
-- **Status:** Verified (13/13 `pytest` passed in 0.98s, 0 `ruff` warnings, all files 64–372 lines).
-- **Delivered Artifacts (`KF03`, `KF04`, `KF05`):**
-  - `backend/app/models/station.py`: SQLAlchemy 2.0 `ChargingStation` entity with GeoAlchemy2 SRID 4326 Point, PostgreSQL GiST spatial index, graceful SQLite test compatibility, and Malaysian metadata (parking level, fee, 24h, verified status).
-  - `backend/app/schemas/station.py`: Pydantic v2 schemas (`PlugInfo`, `AccessStep`, `StationBase`, `StationCreate`, `StationRead`, `StationFilterParams`, `SeedResponse`).
-  - `backend/app/repositories/station_repository.py`: Viewport bounding box filter (`min_lat`, `min_lng`, `max_lat`, `max_lng`), radial envelope, technical/amenity filters, and idempotent seed batch upsert.
-  - `backend/app/services/station_service.py` & `station_seed_data.py`: Haversine distance calculator, 404 enforcement, and realistic Malaysian dataset.
-  - `backend/app/api/v1/stations.py` & `backend/app/api/v1/router.py`: REST endpoints `GET /api/v1/stations`, `GET /api/v1/stations/{id}`, `POST /api/v1/stations/seed-sample`.
-  - `backend/tests/test_stations.py`: Comprehensive test suite verifying seeding idempotency, bounding box queries, proximity searches, connector/power/amenity/24h filters, access steps, and 404 handling.
-
-### [x] Module 1B: Flutter App Shell, Offline Cache & OpenStreetMap Discovery (COMPLETED)
-- **Status:** Verified (9/9 `flutter test` passed, 0 `flutter analyze` issues, all files < 350 lines).
-- **Delivered Artifacts (`KF03`, `KF04`, `KF05`):**
-  - `frontend/lib/core/theme/app_theme.dart`: Emerald/teal Material 3 eco-mobility light & dark themes.
-  - `frontend/lib/features/stations/domain/station_model.dart`: Immutable `ChargingStation`, `PlugInfo`, `AccessStep`, and `StationFilter` domain models with JSON serialization and pure filter matching.
-  - `frontend/lib/features/stations/data/station_local_cache.dart`: SharedPreferences async non-blocking offline cache with realistic Malaysian baseline stations.
-  - `frontend/lib/features/stations/data/station_repository.dart`: Dio repository fetching `/api/v1/stations` with automatic failover to offline cache.
-  - `frontend/lib/features/stations/presentation/station_controller.dart`: Riverpod `StationNotifier` managing station search, multi-criterion filter toggles, selection, and offline mode.
-  - `frontend/lib/features/stations/presentation/widgets/station_filter_bar.dart`: Modular search input and horizontal filter chips (`CCS2`, `Type 2`, `CHAdeMO`, `120kW+ Fast`, `24 Hours`, `Dining`, and `Reset`).
-  - `frontend/lib/features/stations/presentation/widgets/station_detail_sheet.dart`: Modular bottom sheet displaying tariff card, parking level badge ("Basement B1, Pillar B12"), plug breakdown, and step-by-step "How to Access Charger" guide.
-  - `frontend/lib/features/stations/presentation/map_discovery_screen.dart`: `flutter_map` discovery view with custom speed-coded pins, filter bar overlay, offline banner, and quick preview card.
-  - `frontend/lib/main.dart`: Root `ChargeTrailApp` with `ProviderScope`, Material 3 theme, and 3-tab `AppShell`.
-  - `frontend/test/stations_discovery_test.dart` & `frontend/test/widget_test.dart`: 9 comprehensive unit and widget tests covering models, filtering, cache, filter bar, detail sheet, and navigation shell.
-
-### [x] Module 2: Authentication, User Profiles & Saved Station Bookmarks (COMPLETED)
-- **Status:** Verified (17/17 `pytest` passed in 2.35s, 0 `ruff` warnings, 13/13 `flutter test` passed, 0 `flutter analyze` issues, all files 80–330 lines).
-- **Delivered Artifacts (`KF01`, `KF02`, `KF08`):**
-  - `backend/app/core/security.py`: Salted PBKDF2-HMAC-SHA256 password hashing/verification, signed JWT token issuance/decoding, and `get_current_user` HTTPBearer dependency.
-  - `backend/app/models/user.py`: SQLAlchemy 2.0 `User` and `SavedStation` entities with cascading relationships, preferred connector field, and uniqueness constraints.
-  - `backend/app/schemas/user.py`: Pydantic v2 schemas (`UserRegister`, `UserLogin`, `UserProfileUpdate`, `UserProfileRead`, `TokenResponse`, `BookmarkToggleResponse`) with regex email validation.
-  - `backend/app/repositories/user_repository.py`: Async user CRUD, case-insensitive email lookup, bookmark toggling, and saved stations relational queries.
-  - `backend/app/services/auth_service.py`: Registration with conflict checks, login validation, profile management, and bookmark toggling.
-  - `backend/app/services/station_seed_data.py`: Extracted Malaysian dataset seeder to enforce strict file modularity (<350 lines).
-  - `backend/app/api/v1/auth.py` & `router.py`: REST endpoints `/auth/register`, `/auth/login`, `/users/me`, `/users/me/bookmarks/{id}`, `/users/me/bookmarks`.
-  - `backend/tests/test_auth.py`: 4 comprehensive test suites verifying registration, duplicate email rejection (409), authentication failures (401), profile edits, and bookmark toggle lifecycle.
-  - `frontend/lib/features/auth/domain/user_model.dart`: Immutable `UserProfile` model with JSON roundtrip and bookmark query helpers.
-  - `frontend/lib/features/auth/data/auth_repository.dart`: Dio authentication repository with offline local demo session failover in SharedPreferences.
-  - `frontend/lib/features/auth/presentation/auth_controller.dart`: Riverpod `AuthNotifier` managing session restoration, login/register, demo login, profile updates, and bookmark toggling.
-  - `frontend/lib/features/auth/presentation/profile_screen.dart`: Complete profile screen with Sign In/Register toggle, demo driver shortcut, profile details card, connector choice chips, and saved station bookmarks list.
-  - `frontend/lib/features/stations/presentation/widgets/station_detail_sheet.dart`: Added interactive bookmark button wired to `authControllerProvider`.
-  - `frontend/lib/main.dart`: Integrated `ProfileScreen` as the 3rd destination in the `NavigationBar`.
-  - `frontend/test/auth_profile_test.dart`: Unit and widget tests for models, auth notifier, and profile screen.
-
-### [x] Module 3: Community Contributions, Admin Moderation & Survei Mikro Consensus Engine (COMPLETED)
-- **Status:** Verified (20/20 `pytest` passed in 3.78s, 0 `ruff` warnings, 17/17 `flutter test` passed, 0 `flutter analyze` issues, all files 80–335 lines).
-- **Delivered Artifacts (`KF06`, `KF07`, `KF09`, `KF16`):**
-  - `backend/app/models/community.py`: SQLAlchemy 2.0 `StationReview` and `MicroSurveyVote` models for check-in reviews and 1-tap telemetry dimensions.
-  - `backend/app/schemas/community.py`: Pydantic v2 schemas (`ReviewCreate`, `ReviewRead`, `MicroSurveyCreate`, `MicroSurveyConsensusRead`, `StationModerationUpdate`).
-  - `backend/app/repositories/community_repository.py`: Async community station creation with `is_verified=False`, moderation queue queries, review rating recomputations, and micro-survey vote tallies.
-  - `backend/app/services/community_service.py`: 3-vote consensus engine evaluating plug status (`out_of_order` triggers `is_available = False`), parking fee (`free` triggers `parking_fee_myr = 0.0`), and access difficulty.
-  - `backend/app/api/v1/community.py` & `router.py`: REST endpoints `/community/stations`, `/community/stations/pending`, `/community/stations/{id}/moderate`, `/community/stations/{id}/reviews`, and `/community/stations/{id}/micro-survey`.
-  - `backend/tests/test_community.py`: Comprehensive tests for station submission and approval, review rating recalculation, and 3-vote consensus auto-updates.
-  - `frontend/lib/features/community/domain/community_models.dart`: Immutable `StationReview` and `MicroSurveyConsensus` models with summary badge text logic.
-  - `frontend/lib/features/community/data/community_repository.dart`: Dio client with SharedPreferences offline failover for offline review and consensus testing.
-  - `frontend/lib/features/community/presentation/community_controller.dart`: Riverpod `CommunityNotifier` managing reviews, votes, pending stations, and moderation actions.
-  - `frontend/lib/features/community/presentation/widgets/micro_survey_card.dart`: Embedded widget in `StationDetailSheet` with 1-tap voting chips, consensus badge, and check-in review form.
-  - `frontend/lib/features/community/presentation/submit_station_sheet.dart`: 2-tab modal sheet for Submit Charger (`KF06`) and Admin Moderation Queue (`KF09`) with 1-tap Approve & Publish.
-  - `frontend/lib/features/stations/presentation/map_discovery_screen.dart`: Added `+ Add Charger` floating action button opening the submission sheet.
-  - `frontend/test/community_survey_test.dart`: 4 comprehensive tests for consensus models, micro survey card, and submission sheet.
-
-### [x] Module 4: EV Vehicle Profiles & Garage Management (COMPLETED)
-- **Status:** Verified (24/24 `pytest` passed in 4.04s, 0 `ruff` warnings, 22/22 `flutter test` passed, 0 `flutter analyze` issues, all files 80–335 lines).
-- **Delivered Artifacts (`KF11`, `KF12`):**
-  - `backend/app/models/vehicle.py`: SQLAlchemy 2.0 `VehicleProfile` model supporting battery capacity, range, consumption rate, peak DC charge speed, reserve SoC buffer, and primary EV selection.
-  - `backend/app/schemas/vehicle.py`: Pydantic v2 schemas (`VehiclePresetRead`, `VehicleCreate`, `VehicleUpdate`, `VehicleRead`) with computed effective safe range.
-  - `backend/app/services/vehicle_presets.py`: Curated factory specifications for 6 popular Malaysian EVs (`Proton e.MAS 7 Prime`, `BYD Atto 3 Extended Range`, `Tesla Model 3 Long Range`, `BYD Dolphin`, `Hyundai IONIQ 5`, `Nissan Leaf e+`).
-  - `backend/app/repositories/vehicle_repository.py`: Multi-vehicle garage operations, automatic single-primary enforcement, and deletion with primary auto-promotion.
-  - `backend/app/services/vehicle_service.py`: Business logic for garage profiles, reserve buffer range math, and presets catalog.
-  - `backend/app/api/v1/vehicles.py` & `router.py`: REST endpoints `/vehicles/presets`, `/vehicles`, `/vehicles/{id}`, `/vehicles/{id}/select`, and `/vehicles/{id}` (delete).
-  - `backend/tests/test_vehicles.py`: Async tests verifying preset catalog retrieval, primary EV toggling, reserve SoC effective range calculation, and deletion.
-  - `frontend/lib/features/vehicles/domain/vehicle_model.dart`: Immutable `VehicleProfile` model with physics methods for range at SoC, safe usable range after reserve buffer, and 20%->80% charge duration estimation.
-  - `frontend/lib/features/vehicles/data/vehicle_repository.dart`: Dio client with SharedPreferences offline cache pre-seeded with Malaysian presets and default garage.
-  - `frontend/lib/features/vehicles/presentation/vehicle_controller.dart`: Riverpod `VehicleNotifier` managing multi-car garage, active EV selection, and SoC slider.
-  - `frontend/lib/features/vehicles/presentation/garage_screen.dart`: Complete garage screen with active vehicle hero card, battery SoC slider (10%-100%), real-time safe range telemetry, garage vehicles list, and 1-tap Malaysian preset addition sheet.
-  - `frontend/lib/features/stations/presentation/widgets/station_detail_sheet.dart`: Integrated real-time active EV charging estimate badge (`Est. 20%->80% for <Active EV>: ~XX mins`).
-  - `frontend/lib/main.dart`: Wired `GarageScreen` as the 3rd destination (`EV Garage`) in the app shell `NavigationBar`.
-  - `frontend/test/vehicle_garage_test.dart`: 4 comprehensive unit and widget tests for physics math, controller state, and garage UI.
-
-### [x] Module 5: Backend Route Planner, OSRM Polyline & Range Anxiety Engine (COMPLETED)
-- **Status:** Verified (28/28 `pytest` passed in 12.56s, 0 `ruff` warnings, 22/22 `flutter test` passed, 0 `flutter analyze` issues, all files 50–325 lines).
-- **Delivered Artifacts (`KF10`, `KF13`, `KF14`, `KF15`):**
-  - `backend/app/schemas/routing.py`: Pydantic v2 schemas (`LatLngPoint`, `PlaceSuggestion`, `RoutePlanRequest`, `ChargingStopRecommendation`, `RoutePlanResponse`).
-  - `backend/app/services/geocoding_service.py`: Malaysian place geocoder curated with 13 major transit hubs and landmarks (KLCC, IOI City Mall, Sunway Pyramid, Tapah RSA, Gurney Plaza, Southkey JB, etc.) with Photon fallback.
-  - `backend/app/services/osrm_client.py`: Highway routing client producing realistic multi-point North-South PLUS Expressway polylines with node interpolation, detour distances, and drive times.
-  - `backend/app/services/route_planner_service.py`: Physics-aware trip simulator:
-    - Dynamic vehicle spec overrides from garage `vehicle_id`.
-    - Total energy expenditure and uncharged arrival SoC calculation (`KF14`).
-    - Range anxiety classification: `"safe"`, `"warning"`, and `"critical_charging_required"`.
-    - Spatial corridor filtering and stop optimizer (`KF15`) recommending reachable highway chargers (e.g. Tapah RSA) and computing charge minutes, costs, and safe final arrival battery.
-  - `backend/app/api/v1/routing.py` & `router.py`: REST endpoints `GET /api/v1/routing/places` and `POST /api/v1/routing/plan`.
-  - `backend/tests/test_routing.py`: 4 comprehensive test suites covering place search, short safe urban route, long highway trip requiring charging at Tapah RSA, and garage vehicle overrides.
-
-### [x] Module 6: Flutter Route Planner UI, Interactive Polyline & Final Thesis Hardening (COMPLETED)
-- **Status:** Verified (28/28 `pytest` passed, 0 `ruff` warnings, 27/27 `flutter test` passed, 0 `flutter analyze` issues, all files 23–325 lines).
-- **Delivered Artifacts (`KF10`, `KF13`, `KF14`, `KF15`):**
-  - `frontend/lib/features/routing/domain/route_models.dart`: Immutable models `PlaceSuggestion`, `ChargingStopRecommendation`, and `RoutePlanResult` with status evaluation properties.
-  - `frontend/lib/features/routing/data/route_repository.dart`: Dio client connecting to `/api/v1/routing` with deterministic offline physics & corridor stop fallback for KL <-> Putrajaya and KL <-> Penang.
-  - `frontend/lib/features/routing/presentation/route_controller.dart`: Riverpod `RouteNotifier` managing origin/destination selection, swap, battery SoC slider, and pre-computed flagship route on boot.
-  - `frontend/lib/features/routing/presentation/widgets/route_telemetry_card.dart`: Range anxiety status badge (color-coded emerald/amber/red), journey metrics overview, and interactive recommended charging stops timeline (tapping opens `StationDetailSheet`).
-  - `frontend/lib/features/routing/presentation/route_planner_screen.dart`: Interactive OpenStreetMap route map with `PolylineLayer`, endpoint markers, stop pins, starting SoC slider, and quick presets (`KL -> Putrajaya (Safe)` and `KL -> Penang (Needs Stop)`).
-  - `frontend/lib/main.dart`: Wired `RoutePlannerScreen` directly into Tab 2 (`Route Planner`) of the app navigation shell. All 4 navigation destinations (`Explore Map`, `Route Planner`, `EV Garage`, `Profile & Saved`) are fully live and interactive!
-  - `frontend/test/route_planner_test.dart`: Comprehensive unit and widget tests for route models, offline physics, notifier state, and planner screen UI.
-
-### [x] Module 6.5: Real-Device UI/UX Polish: Map Layer Switcher, Exact GPS Location, Expanded 12-Station Malaysian Dataset & Unified Wi-Fi API Config (COMPLETED)
-- **Status:** Verified (28/28 `pytest` passed, 0 `ruff` warnings, 34/34 `flutter test` passed with ZERO OSM console warnings, 0 `flutter analyze` issues, all files 23–336 lines).
-- **Delivered Artifacts:**
-  - `frontend/lib/core/config/map_tile_config.dart`: Open-source $0 raster tile engine (`defaultStreet`, `satellite`, `dark`), Riverpod `mapTileStyleProvider`, and compact floating `MapStyleSelectorButton` widget.
-  - `frontend/lib/core/services/location_service.dart`: `LocationService` with `UserLocationNotifier` and pulsing blue radar `UserLocationMarkerWidget` showing resolved user GPS coordinates with a feedback SnackBar on both Map Discovery and Route Planner.
-  - Expanded Peninsular Malaysia dataset to 12 flagship EV stations.
-  - Synchronized in `backend/app/services/station_seed_data.py` (296 lines) and `frontend/lib/features/stations/data/station_local_cache.dart` (336 lines).
-  - Verified unified `ApiConfig.baseUrl` across all 5 repositories (`StationRepository`, `AuthRepository`, `CommunityRepository`, `VehicleRepository`, `RouteRepository`).
-  - Added 1-tap "Reconnect to Live Server" on the offline banner in `MapDiscoveryScreen`.
-  - `frontend/test/map_polish_test.dart`: 7 unit & widget tests verifying tile URLs, provider updates, 12 stations, GPS markers, and Wi-Fi repository instantiation.
-
-### [x] Module 7: CI/CD Pipeline, Observability, Thesis Evaluation & Final Full-Stack UAT Guide Upgrade (COMPLETED)
-- **Status:** Verified (30/30 `pytest` passed across 7 suites, 0 `ruff` warnings, 34/34 `flutter test` passed across 6 suites, 0 `flutter analyze` issues, all 88 files 23–336 lines).
-- **Delivered Artifacts:**
-  - `backend/app/core/observability.py`: `ObservabilityStore` tracking request counts, latencies, route statistics, and `RequestTimingMiddleware` injecting `X-Process-Time-Ms` response header.
-  - `backend/app/api/v1/health.py`: `GET /api/v1/metrics` endpoint exposing runtime latency, server uptime, verified vs pending station inventory, and architecture metadata.
-  - `backend/tests/test_observability.py`: Comprehensive test suite verifying `X-Process-Time-Ms` header and system metrics.
-  - `.github/workflows/ci.yml`: Production GitHub Actions CI/CD pipeline enforcing Ruff lint/format, pytest, Flutter analyze, Flutter test, and file size ceilings (< 400 lines) on push and pull request.
-  - `docs/THESIS_EVALUATION.md`: Defect resolution matrix for all legacy v1 defects (`S-01` to `S-04`, `B-01` to `B-04`, `C-01` to `C-05`) and quantitative engineering comparison (100% $0 API cost, 10x modularization, 64 automated tests, < 350ms route simulation).
-  - `docs/UAT_GUIDE.md`: Comprehensive end-to-end visual testing checklist covering all 4 tabs, 12 Malaysian hubs, map style switcher, GPS location, community moderation queue, Survei Mikro consensus, EV garage telemetry, and highway route planner.
-
-### [x] Module 7.5: Real-Device UAT Bugfixes, Watermark-Free Map Tiles, Real Hardware GPS, Lazy OSM Viewport Charger Discovery with On-Interaction DB Upsert, and Responsive Layout Overflow Fixes (COMPLETED)
-- **Status:** Verified (31/31 `pytest` passed across 7 suites, 0 `ruff` warnings, 39/39 `flutter test` passed across 7 suites, 0 `flutter analyze` issues, all 91 files strictly under 350 lines).
-- **Delivered Artifacts:**
-  - `frontend/lib/core/config/map_tile_config.dart`: Replaced CartoDB watermark tiles with 100% watermark-free, zero-API-key open tile servers (Esri World Street Map, Esri World Imagery, Esri Canvas World Dark Gray Base).
-  - `frontend/lib/core/services/location_service.dart`: Upgraded with real hardware phone GPS via `geolocator: ^13.0.4` + Nominatim reverse geocoding with nearest-Malaysian-city fallback. Added Android fine/coarse location permissions in `AndroidManifest.xml`.
-  - `frontend/lib/features/stations/data/osm_overpass_service.dart`: Lazy OpenStreetMap Overpass live charging station discovery with spatial cell cache and 150m deduplication.
-  - `backend/app/api/v1/stations.py` & `frontend/lib/features/stations/data/station_repository.dart`: Added `POST /api/v1/stations/upsert-external` for on-interaction persistence of OSM live pins to database and local cache.
-  - `frontend/lib/features/stations/presentation/map_discovery_screen.dart`: Repositioned `MapStyleSelectorButton` right beneath the search/filter bar and added a compact `"🔄 Scan Viewport OSM"` discovery pill button.
-  - `frontend/lib/features/community/presentation/submit_station_sheet.dart`: Added Charger Pin Location card with "Use My GPS" auto-fill, Malaysian City dropdown, and modularized `ModerationQueueTab`.
-  - **Pixel Overflow Fixes**: Fixed `RenderFlex overflowed by 16 pixels` in `GarageScreen` active vehicle hero and `RenderFlex overflowed by 15 pixels` in `RouteTelemetryCard` recommended stops header on narrow phone viewports.
-  - `frontend/test/uat_fixes_test.dart`: 5 comprehensive tests verifying narrow screen rendering without overflow, pin auto-fill, Nominatim reverse geocoding, and Overpass deduplication.
-
-### [x] Module 7.6: Live Server ADB-Reverse Connectivity Fix, Multi-Source Open EV Charger Discovery, and Automatic Nearby Chargers Detection & Carousel (COMPLETED)
-- **Status:** Verified (31/31 `pytest` passed across 7 suites, 0 `ruff` warnings, 43/43 `flutter test` passed across 8 suites, 0 `flutter analyze` issues, all 94 files strictly under 350 lines).
-- **Delivered Artifacts:**
-  - `frontend/android/app/src/main/AndroidManifest.xml`: Enabled `android:usesCleartextTraffic="true"` to eliminate Android 9+ plaintext HTTP blocking for local server connectivity.
-  - `scripts/run_uat.ps1`: Automated `adb reverse tcp:8000 tcp:8000` to tunnel port 8000 directly through ADB, completely bypassing Windows Firewall on connected phones.
-  - `frontend/lib/features/stations/data/station_repository.dart`: Added multi-target candidate base URL probing (`_dio.options.baseUrl`, `http://127.0.0.1:8000`, `http://10.0.2.2:8000`) with automatic active base URL adoption.
-  - `frontend/lib/features/stations/data/malaysia_ev_registry.dart` (110 lines): 32 open-data EV stations across all Malaysian states with radial search helper.
-  - `frontend/lib/features/stations/data/osm_overpass_service.dart` (197 lines): 3-Tier Open Discovery Engine (Tier 1: Overpass nodes & ways around:15000m; Tier 2: Photon open POI query; Tier 3: Regional Malaysia Open Registry) with 150m deduplication.
-  - `frontend/lib/features/stations/presentation/widgets/nearby_stations_carousel.dart` (203 lines): Horizontal nearby charger carousel with ascending distance chips, Open Data vs Verified DB indicators, and full scrollable list modal.
-  - `frontend/lib/features/stations/presentation/map_discovery_screen.dart`: Wired GPS-triggered nearby scan and carousel integration with on-tap camera movement and details sheet.
-  - `frontend/test/nearby_and_discovery_test.dart`: Comprehensive unit and widget tests for open registry, distance sorting, and carousel interaction.
-
-### [x] Module 7.7: Persistent Local SQLite Fallback, Lifespan Auto-Seed & Live DB Inspector (COMPLETED)
-- **Status:** Verified (31/31 `pytest` passed across 7 suites, 0 `ruff` warnings, 43/43 `flutter test` passed across 8 suites, 0 `flutter analyze` issues, all 94 files strictly under 350 lines).
-- **Delivered Artifacts:**
-  - `backend/app/core/config.py` & `backend/app/core/database.py`: Added automatic persistent SQLite fallback (`sqlite+aiosqlite:///./chargetrail_local.db`) when PostgreSQL is not running on port 5432, eliminating Docker dependency for Windows development.
-  - `backend/app/main.py`: Enhanced FastAPI `lifespan` context manager to automatically create all model tables via `Base.metadata.create_all` and seed the 12 Malaysian baseline stations on server boot if empty.
-  - `backend/app/services/station_service.py`: `upsert_external_station` ensures externally tapped OSM chargers (`osm_live`, `open_data_my`) are saved with `is_verified=True` and their source tag preserved.
-  - `backend/app/api/v1/health.py`: Updated `GET /api/v1/metrics` with `stations_by_source` breakdown.
-  - `scripts/view_db.ps1`: One-command live database and OSM import inspector script displaying formatted station inventory table and source breakdown.
-  - Verified live running server on `http://0.0.0.0:8000` with ADB reverse tunnel active and live station queries responding with HTTP 200.
+| Module | Scope & Functional Requirements (`KF01`–`KF16`) | Verification Summary | Status |
+|:---|:---|:---|:---|
+| **M0** | Workspace, FastAPI Core, Health API & Ruff/Pytest Scaffolding | `4/4 pytest`, `0 ruff` | ✅ Done |
+| **M1A** | Backend PostGIS/SQLite Spatial Core, Filtering & Seeder (`KF03`–`KF05`) | `13/13 pytest`, `0 ruff` | ✅ Done |
+| **M1B** | Flutter Material 3 Shell, Offline Cache & OSM Map Discovery (`KF03`–`KF05`) | `9/9 flutter test`, `0 analyze` | ✅ Done |
+| **M2** | JWT Auth, Driver Profiles & Saved Station Bookmarks (`KF01`, `KF02`, `KF08`) | `17/17 pytest`, `13/13 flutter` | ✅ Done |
+| **M3** | Community Submissions, Moderation Queue & 3-Vote Survei Mikro (`KF06`, `KF07`, `KF09`, `KF16`) | `20/20 pytest`, `17/17 flutter` | ✅ Done |
+| **M4** | Malaysian EV Preset Catalog, Multi-Car Garage & SoC Telemetry (`KF11`, `KF12`) | `24/24 pytest`, `22/22 flutter` | ✅ Done |
+| **M5** | Backend OSRM Polyline, Photon Geocoding & Physics Range Anxiety Engine (`KF10`, `KF13`–`KF15`) | `28/28 pytest`, `0 ruff` | ✅ Done |
+| **M6** | Flutter Route Planner UI, Polyline Layer & Stop Timeline (`KF10`, `KF13`–`KF15`) | `28/28 pytest`, `27/27 flutter` | ✅ Done |
+| **M6.5** | Map Style Switcher, Hardware GPS, 12-Hub Dataset & Unified `ApiConfig` | `28/28 pytest`, `34/34 flutter` | ✅ Done |
+| **M7** | GitHub Actions CI/CD, Observability `/metrics`, `THESIS_EVALUATION.md` & `UAT_GUIDE.md` | `30/30 pytest`, `34/34 flutter` | ✅ Done |
+| **M7.5** | Watermark-Free Esri Tiles, `geolocator` GPS, Overpass Lazy Upsert & 360px Overflow Fixes | `31/31 pytest`, `39/39 flutter` | ✅ Done |
+| **M7.6** | Android Cleartext + `adb reverse` Tunnel, 3-Tier Open EV Discovery & Nearby Carousel | `31/31 pytest`, `43/43 flutter` | ✅ Done |
+| **M7.7** | Persistent `chargetrail_local.db` Fallback, Lifespan Auto-Seed & `scripts/view_db.ps1` | `31/31 pytest`, `43/43 flutter` | ✅ Done |
+| **M7.8** | Free-Text Place Search, True OSRM Road Geometry, Collapsible Cards & Google Maps/Waze Deep-Link | `31/31 pytest`, `48/48 flutter` | ✅ Done |
+| **M7.9** | Active EV Garage Telemetry Badge, `Xh Ym` Duration Formatting & Mutual-Exclusion Panel UX | `31/31 pytest`, `9/9 route_planner_test`, `0 analyze` | ✅ Done |

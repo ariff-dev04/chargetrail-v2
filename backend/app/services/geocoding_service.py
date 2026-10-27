@@ -15,6 +15,30 @@ MALAYSIAN_LANDMARKS: list[PlaceSuggestion] = [
         category="mall",
     ),
     PlaceSuggestion(
+        name="The Exchange TRX",
+        city="Kuala Lumpur",
+        state="Wilayah Persekutuan Kuala Lumpur",
+        latitude=3.1428,
+        longitude=101.7188,
+        category="mall",
+    ),
+    PlaceSuggestion(
+        name="Mid Valley Megamall",
+        city="Kuala Lumpur",
+        state="Wilayah Persekutuan Kuala Lumpur",
+        latitude=3.1179,
+        longitude=101.6778,
+        category="mall",
+    ),
+    PlaceSuggestion(
+        name="Pavilion Bukit Jalil",
+        city="Kuala Lumpur",
+        state="Wilayah Persekutuan Kuala Lumpur",
+        latitude=3.0514,
+        longitude=101.6706,
+        category="mall",
+    ),
+    PlaceSuggestion(
         name="IOI City Mall / Putrajaya",
         city="Putrajaya",
         state="Wilayah Persekutuan Putrajaya",
@@ -28,6 +52,14 @@ MALAYSIAN_LANDMARKS: list[PlaceSuggestion] = [
         state="Selangor",
         latitude=3.0733,
         longitude=101.6078,
+        category="mall",
+    ),
+    PlaceSuggestion(
+        name="1 Utama Shopping Centre",
+        city="Petaling Jaya",
+        state="Selangor",
+        latitude=3.1511,
+        longitude=101.6152,
         category="mall",
     ),
     PlaceSuggestion(
@@ -47,6 +79,14 @@ MALAYSIAN_LANDMARKS: list[PlaceSuggestion] = [
         category="mall",
     ),
     PlaceSuggestion(
+        name="Auto-City Juru / PLUS Highway",
+        city="Perai",
+        state="Penang",
+        latitude=5.3377,
+        longitude=100.4288,
+        category="highway_rsa",
+    ),
+    PlaceSuggestion(
         name="Mid Valley Southkey / Johor Bahru",
         city="Johor Bahru",
         state="Johor",
@@ -55,12 +95,36 @@ MALAYSIAN_LANDMARKS: list[PlaceSuggestion] = [
         category="mall",
     ),
     PlaceSuggestion(
+        name="Skudai Shell RSA / PLUS Southbound",
+        city="Skudai",
+        state="Johor",
+        latitude=1.5342,
+        longitude=103.6622,
+        category="highway_rsa",
+    ),
+    PlaceSuggestion(
+        name="Pagoh RSA Hub / PLUS Highway",
+        city="Muar",
+        state="Johor",
+        latitude=2.1500,
+        longitude=102.7700,
+        category="highway_rsa",
+    ),
+    PlaceSuggestion(
         name="Ayer Keroh Interchange / Melaka",
         city="Ayer Keroh",
         state="Melaka",
         latitude=2.2740,
         longitude=102.2850,
         category="city",
+    ),
+    PlaceSuggestion(
+        name="Jonker Street / Melaka City",
+        city="Melaka",
+        state="Melaka",
+        latitude=2.1952,
+        longitude=102.2483,
+        category="tourist_hub",
     ),
     PlaceSuggestion(
         name="Seremban Gateway / PLUS Expressway",
@@ -95,6 +159,14 @@ MALAYSIAN_LANDMARKS: list[PlaceSuggestion] = [
         category="city",
     ),
     PlaceSuggestion(
+        name="Taiping Lake Gardens",
+        city="Taiping",
+        state="Perak",
+        latitude=4.8517,
+        longitude=100.7417,
+        category="tourist_hub",
+    ),
+    PlaceSuggestion(
         name="Cyberjaya Silicon Valley Hub",
         city="Cyberjaya",
         state="Selangor",
@@ -108,6 +180,22 @@ MALAYSIAN_LANDMARKS: list[PlaceSuggestion] = [
         state="Kedah",
         latitude=6.1248,
         longitude=100.3678,
+        category="city",
+    ),
+    PlaceSuggestion(
+        name="Kota Bharu Town Centre",
+        city="Kota Bharu",
+        state="Kelantan",
+        latitude=6.1254,
+        longitude=102.2386,
+        category="city",
+    ),
+    PlaceSuggestion(
+        name="Kuala Terengganu Waterfront",
+        city="Kuala Terengganu",
+        state="Terengganu",
+        latitude=5.3302,
+        longitude=103.1408,
         category="city",
     ),
 ]
@@ -132,12 +220,12 @@ class GeocodingService:
         if len(matched) >= limit:
             return matched[:limit]
 
-        # 2. Try querying Photon open-source Nominatim API if query is long enough
+        # 2. Try querying Photon open-source Nominatim API
         try:
-            async with httpx.AsyncClient(timeout=1.2) as client:
+            async with httpx.AsyncClient(timeout=2.0) as client:
                 res = await client.get(
                     "https://photon.komoot.io/api/",
-                    params={"q": query, "limit": limit},
+                    params={"q": query, "lat": 3.1578, "lon": 101.7118, "limit": limit},
                 )
                 if res.status_code == 200:
                     data = res.json()
@@ -147,7 +235,6 @@ class GeocodingService:
                         coords = geom.get("coordinates", [])
                         if len(coords) >= 2:
                             lng, lat = coords[0], coords[1]
-                            # Only include places roughly in Malaysian/SE-Asia geographic envelope
                             if 0.5 <= lat <= 8.5 and 99.0 <= lng <= 120.0:
                                 name = props.get("name") or props.get("street") or query
                                 city = props.get("city") or props.get("county") or "Malaysia"
@@ -163,7 +250,39 @@ class GeocodingService:
                                 if not any(m.name == item.name for m in matched):
                                     matched.append(item)
         except Exception:
-            # Gracefully ignore open geocoding timeout or network errors
             pass
+
+        # 3. Nominatim Fallback if still under limit
+        if len(matched) < limit:
+            try:
+                headers = {"User-Agent": "ChargeTrail-v2/1.0"}
+                async with httpx.AsyncClient(timeout=2.0, headers=headers) as client:
+                    res = await client.get(
+                        "https://nominatim.openstreetmap.org/search",
+                        params={"format": "jsonv2", "countrycodes": "my", "q": query, "limit": 5},
+                    )
+                    if res.status_code == 200:
+                        data = res.json()
+                        for item_data in data:
+                            lat = float(item_data.get("lat", 0.0))
+                            lng = float(item_data.get("lon", 0.0))
+                            if 0.5 <= lat <= 8.5 and 99.0 <= lng <= 120.0:
+                                display_name = item_data.get("display_name", "")
+                                parts = [p.strip() for p in display_name.split(",")]
+                                name = parts[0] if parts else query
+                                city = parts[1] if len(parts) > 1 else "Malaysia"
+                                state = parts[-2] if len(parts) > 2 else "Malaysia"
+                                item = PlaceSuggestion(
+                                    name=name,
+                                    city=city,
+                                    state=state,
+                                    latitude=lat,
+                                    longitude=lng,
+                                    category="geocoded",
+                                )
+                                if not any(m.name == item.name for m in matched):
+                                    matched.append(item)
+            except Exception:
+                pass
 
         return matched[:limit]

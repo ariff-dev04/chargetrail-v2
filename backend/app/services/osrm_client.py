@@ -1,5 +1,7 @@
 """OSRM routing client providing highway polylines and road travel times."""
 
+import math
+
 import httpx
 
 from app.schemas.routing import LatLngPoint
@@ -9,7 +11,7 @@ from app.services.station_service import haversine_distance_km
 class OsrmClient:
     """Client fetching road routing polylines and travel metrics via OSRM with offline fallbacks."""
 
-    def __init__(self, base_url: str = "http://router.project-osrm.org") -> None:
+    def __init__(self, base_url: str = "https://router.project-osrm.org") -> None:
         """Initialize OSRM client with base API URL."""
         self.base_url = base_url
 
@@ -19,16 +21,21 @@ class OsrmClient:
         origin_lng: float,
         dest_lat: float,
         dest_lng: float,
+        waypoints: list[tuple[float, float]] | None = None,
         use_live_osrm: bool = True,
     ) -> tuple[list[LatLngPoint], float, int]:
         """Fetch road polyline coordinates, total driving distance (km), and drive duration (minutes)."""
         if use_live_osrm:
             try:
-                async with httpx.AsyncClient(timeout=1.5) as client:
-                    url = (
-                        f"{self.base_url}/route/v1/driving/"
-                        f"{origin_lng},{origin_lat};{dest_lng},{dest_lat}"
-                    )
+                coord_pairs = [(origin_lng, origin_lat)]
+                if waypoints:
+                    for w_lat, w_lng in waypoints:
+                        coord_pairs.append((w_lng, w_lat))
+                coord_pairs.append((dest_lng, dest_lat))
+                coords_str = ";".join(f"{lng},{lat}" for lng, lat in coord_pairs)
+
+                async with httpx.AsyncClient(timeout=3.5) as client:
+                    url = f"{self.base_url}/route/v1/driving/{coords_str}"
                     res = await client.get(
                         url,
                         params={"overview": "full", "geometries": "geojson"},
@@ -42,6 +49,12 @@ class OsrmClient:
                             dur_seconds = route.get("duration", 0.0)
                             coords = route.get("geometry", {}).get("coordinates", [])
 
+                            if len(coords) > 800:
+                                step = math.ceil(len(coords) / 800)
+                                downsampled = [coords[i] for i in range(0, len(coords) - 1, step)]
+                                downsampled.append(coords[-1])
+                                coords = downsampled
+
                             points = [LatLngPoint(latitude=c[1], longitude=c[0]) for c in coords]
                             if points:
                                 dist_km = round(dist_meters / 1000.0, 1)
@@ -52,12 +65,30 @@ class OsrmClient:
                 pass
 
         # Deterministic Highway Polyline Synthesis (Peninsular Malaysia PLUS Corridor)
-        return self._synthesize_highway_route(
-            origin_lat,
-            origin_lng,
-            dest_lat,
-            dest_lng,
-        )
+        all_stops = [(origin_lat, origin_lng)]
+        if waypoints:
+            all_stops.extend(waypoints)
+        all_stops.append((dest_lat, dest_lng))
+
+        all_points: list[LatLngPoint] = []
+        total_dist = 0.0
+        total_mins = 0
+
+        for i in range(len(all_stops) - 1):
+            seg_pts, seg_dist, seg_mins = self._synthesize_highway_route(
+                all_stops[i][0],
+                all_stops[i][1],
+                all_stops[i + 1][0],
+                all_stops[i + 1][1],
+            )
+            if all_points:
+                all_points.extend(seg_pts[1:])
+            else:
+                all_points.extend(seg_pts)
+            total_dist += seg_dist
+            total_mins += seg_mins
+
+        return all_points, round(total_dist, 1), max(total_mins, 5)
 
     def _synthesize_highway_route(
         self,

@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     ]
 
     # External Zero-Cost Open Services
-    OSRM_BASE_URL: str = "http://router.project-osrm.org"
+    OSRM_BASE_URL: str = "https://router.project-osrm.org"
     PHOTON_GEOCODE_URL: str = "https://photon.komoot.io/api"
 
     # JWT Authentication Security
