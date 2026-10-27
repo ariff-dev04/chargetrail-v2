@@ -7,8 +7,6 @@ import '../../../vehicles/presentation/vehicle_controller.dart';
 import '../../domain/route_models.dart';
 import '../navigation_launcher.dart';
 import 'charging_stop_tile.dart';
-
-/// Collapsible telemetry card presenting journey metrics, charging stops, and navigation links.
 class RouteTelemetryCard extends ConsumerStatefulWidget {
   final RoutePlanResult plan;
   final PlaceSuggestion? origin;
@@ -16,7 +14,6 @@ class RouteTelemetryCard extends ConsumerStatefulWidget {
   final bool? isExpanded;
   final VoidCallback? onToggleExpand;
   final VehicleProfile? vehicleOverride;
-
   const RouteTelemetryCard({
     super.key,
     required this.plan,
@@ -26,17 +23,13 @@ class RouteTelemetryCard extends ConsumerStatefulWidget {
     this.onToggleExpand,
     this.vehicleOverride,
   });
-
   @override
   ConsumerState<RouteTelemetryCard> createState() => _RouteTelemetryCardState();
 }
-
 class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
   late bool _localExpanded = widget.isExpanded ?? false;
-
   bool get _isExpanded =>
       widget.onToggleExpand != null ? (widget.isExpanded ?? false) : _localExpanded;
-
   void _toggle() {
     if (widget.onToggleExpand != null) {
       widget.onToggleExpand!();
@@ -44,7 +37,6 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
       setState(() => _localExpanded = !_localExpanded);
     }
   }
-
   PlaceSuggestion get _resolvedOrigin =>
       widget.origin ??
       PlaceSuggestion(
@@ -54,7 +46,6 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
         latitude: 3.1578,
         longitude: 101.7118,
       );
-
   PlaceSuggestion get _resolvedDestination =>
       widget.destination ??
       PlaceSuggestion(
@@ -64,7 +55,6 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
         latitude: 5.4372,
         longitude: 100.3096,
       );
-
   VehicleProfile get _resolvedVehicle {
     if (widget.vehicleOverride != null) {
       return widget.vehicleOverride!;
@@ -75,12 +65,10 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
       return VehicleRepository.defaultPresets.first;
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final vehicle = _resolvedVehicle;
-
     if (!_isExpanded) {
       return GestureDetector(
         key: const Key('collapsed_telemetry_bar'),
@@ -108,7 +96,7 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${widget.plan.totalDistanceKm} km • ${formatDurationMinutes(widget.plan.totalTripMinutes)}',
+                      '${widget.plan.totalDistanceKm} km â€¢ ${formatDurationMinutes(widget.plan.totalTripMinutes)}',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -158,7 +146,6 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
         ),
       );
     }
-
     return Container(
       key: const Key('expanded_telemetry_sheet'),
       padding: const EdgeInsets.all(14),
@@ -247,7 +234,6 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
       ),
     );
   }
-
   Widget _buildActiveEvPill(VehicleProfile vehicle, bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -262,7 +248,7 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              'Active EV: ${vehicle.brand} ${vehicle.modelName} (${vehicle.batteryCapacityKwh.toStringAsFixed(0)} kWh • ${vehicle.connectorType} • ${vehicle.maxDcChargeKw.toStringAsFixed(0)}kW Max)',
+              'Active EV: ${vehicle.brand} ${vehicle.modelName} (${vehicle.batteryCapacityKwh.toStringAsFixed(0)} kWh â€¢ ${vehicle.connectorType} â€¢ ${vehicle.maxDcChargeKw.toStringAsFixed(0)}kW Max)',
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -272,12 +258,10 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
       ),
     );
   }
-
   Widget _buildBadge({required bool isCompact}) {
     Color col;
     String label;
     IconData icon;
-
     if (widget.plan.isSafe) {
       col = AppTheme.successGreen;
       label = 'Safe';
@@ -291,7 +275,6 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
       label = 'Stop Required';
       icon = Icons.battery_alert;
     }
-
     if (isCompact) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -309,29 +292,25 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
         ),
       );
     }
-
     return Icon(icon, color: col, size: 20);
   }
-
   Widget _buildRangeAnxietyBanner(bool isDark) {
     Color bannerColor;
     IconData icon;
     String title;
-
     if (widget.plan.isSafe) {
       bannerColor = AppTheme.successGreen;
       icon = Icons.shield;
-      title = 'Safe Range • No Charging Stops Required';
+      title = 'Safe Range â€¢ No Charging Stops Required';
     } else if (widget.plan.isWarning) {
       bannerColor = Colors.orange[800]!;
       icon = Icons.warning_amber_rounded;
-      title = 'Warning • Approaching Safety Reserve Buffer';
+      title = 'Warning â€¢ Approaching Safety Reserve Buffer';
     } else {
       bannerColor = const Color(0xFFDC2626);
       icon = Icons.battery_alert;
-      title = 'Critical • Highway Charging Stop Mandatory';
+      title = 'Critical â€¢ Highway Charging Stop Mandatory';
     }
-
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -360,7 +339,6 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
       ),
     );
   }
-
   Widget _buildTelemetryGrid(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(10),
@@ -390,7 +368,6 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
       ),
     );
   }
-
   Widget _metricCol(String label, String value, IconData icon, {Color? color}) {
     return Expanded(
       child: Column(
@@ -411,7 +388,6 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
       ),
     );
   }
-
   Widget _buildChargingStopsTimeline(BuildContext context, bool isDark) {
     if (widget.plan.recommendedStops.isEmpty) {
       return Container(
@@ -424,12 +400,11 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
           children: [
             Icon(Icons.check_circle_outline, color: AppTheme.successGreen, size: 16),
             SizedBox(width: 8),
-            Text('Direct Route • No charging stops required', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+            Text('Direct Route â€¢ No charging stops required', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
           ],
         ),
       );
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -294,4 +294,3 @@ async def test_harvest_viewport_endpoint(async_client: AsyncClient) -> None:
     res = await async_client.post("/api/v1/stations/harvest-viewport", json=req_payload)
     assert res.status_code == 200
     assert isinstance(res.json(), list)
-

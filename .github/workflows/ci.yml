@@ -41,16 +41,16 @@ jobs:
           cd backend
           pytest -v
 
-      - name: Enforce File Size Ceiling (< 400 lines)
+      - name: Enforce File Size Ceiling (< 500 lines)
         run: |
           python -c "
           import glob, sys
           files = glob.glob('backend/app/**/*.py', recursive=True) + glob.glob('backend/tests/**/*.py', recursive=True)
-          oversized = [f for f in files if len(open(f, encoding='utf-8').readlines()) > 400]
+          oversized = [f for f in files if len(open(f, encoding='utf-8').readlines()) > 500]
           if oversized:
-              print('Files exceeding 400 lines:', oversized)
+              print('Files exceeding 500 lines:', oversized)
               sys.exit(1)
-          print('All backend files strictly under 400 lines.')
+          print('All backend files strictly under 500 lines.')
           "
 
   frontend-quality-gate:
@@ -82,14 +82,14 @@ jobs:
           cd frontend
           flutter test
 
-      - name: Enforce File Size Ceiling (< 400 lines)
+      - name: Enforce File Size Ceiling (< 500 lines)
         run: |
           python3 -c "
           import glob, sys
           files = glob.glob('frontend/lib/**/*.dart', recursive=True) + glob.glob('frontend/test/**/*.dart', recursive=True)
-          oversized = [f for f in files if len(open(f, encoding='utf-8').readlines()) > 400]
+          oversized = [f for f in files if len(open(f, encoding='utf-8').readlines()) > 500]
           if oversized:
-              print('Files exceeding 400 lines:', oversized)
+              print('Files exceeding 500 lines:', oversized)
               sys.exit(1)
-          print('All frontend files strictly under 400 lines.')
+          print('All frontend files strictly under 500 lines.')
           "

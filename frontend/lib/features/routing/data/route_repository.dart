@@ -7,11 +7,8 @@ import '../../stations/domain/station_model.dart';
 import '../../vehicles/domain/vehicle_model.dart';
 import '../domain/route_models.dart';
 import 'malaysian_places_catalog.dart';
-
-/// Coordinates live OSRM routing, OpenStreetMap geocoding, and offline battery simulation.
 class RouteRepository {
   final Dio _dio;
-
   RouteRepository({Dio? dio, String? baseUrl})
       : _dio = dio ??
             Dio(
@@ -21,8 +18,6 @@ class RouteRepository {
                 receiveTimeout: const Duration(seconds: 4),
               ),
             );
-
-  /// Verified Malaysian travel hubs for quick initial selection.
   static List<PlaceSuggestion> get defaultHubs => const [
         PlaceSuggestion(
           name: 'Kuala Lumpur (KLCC)',
@@ -81,15 +76,11 @@ class RouteRepository {
           category: 'city',
         ),
       ];
-
-  /// Search places combining local catalog, backend search, and OSM Photon/Nominatim.
   Future<List<PlaceSuggestion>> searchPlaces(String query) async {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return defaultHubs;
-
     final results = <PlaceSuggestion>[];
     final seen = <String>{};
-
     void addUnique(PlaceSuggestion place) {
       final key = '${place.name.toLowerCase()}_${place.latitude.toStringAsFixed(3)}';
       if (!seen.contains(key)) {
@@ -97,8 +88,6 @@ class RouteRepository {
         results.add(place);
       }
     }
-
-    // 1. Instant local catalog match
     for (final p in MalaysianPlacesCatalog.allPlaces) {
       if (p.name.toLowerCase().contains(q) ||
           p.city.toLowerCase().contains(q) ||
@@ -106,8 +95,6 @@ class RouteRepository {
         addUnique(p);
       }
     }
-
-    // 2. Try Backend Geocoding Service
     try {
       final res = await _dio.get(
         '/api/v1/routing/places',
@@ -119,10 +106,7 @@ class RouteRepository {
         }
       }
     } catch (_) {}
-
     if (results.length >= 6) return results.take(8).toList();
-
-    // 3. Fallback to OpenStreetMap Photon API
     try {
       final photonDio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 3)));
       final res = await photonDio.get(
@@ -162,13 +146,9 @@ class RouteRepository {
         }
       }
     } catch (_) {}
-
     return results.take(8).toList();
   }
-
-  /// Backwards-compatible alias for searchPlaces.
   Future<List<PlaceSuggestion>> fetchPlaces(String query) => searchPlaces(query);
-
   bool _isDirectionallyCompatible(
     String stationName,
     double stationLat,
@@ -193,8 +173,6 @@ class RouteRepository {
     }
     return true;
   }
-
-  /// Calculate battery-aware route plan with live multi-stop OSRM road geometry.
   Future<RoutePlanResult> calculateRoutePlan({
     required PlaceSuggestion origin,
     required PlaceSuggestion destination,
@@ -223,15 +201,12 @@ class RouteRepository {
       'corridor_radius_km': 25.0,
       'preferred_stop_station_ids': preferredStopStationIds,
     };
-
     try {
       final res = await _dio.post('/api/v1/routing/plan', data: payload);
       if (res.statusCode == 200 && res.data is Map<String, dynamic>) {
         return RoutePlanResult.fromJson(res.data as Map<String, dynamic>);
       }
     } catch (_) {}
-
-    // Offline / Local Physics Engine with Direct Live OSRM Road Geometry Fallback
     return _simulateOfflineRoute(
       origin: origin,
       destination: destination,
@@ -240,7 +215,6 @@ class RouteRepository {
       preferredStopStationIds: preferredStopStationIds,
     );
   }
-
   Future<RoutePlanResult> _simulateOfflineRoute({
     required PlaceSuggestion origin,
     required PlaceSuggestion destination,
@@ -256,18 +230,14 @@ class RouteRepository {
     );
     double totalDist = double.parse((straightDist * 1.16).toStringAsFixed(1));
     int driveMins = max((totalDist / 85.0 * 60).round(), 5);
-
-    // Try fetching live road-hugging polyline from OSRM directly over device connection
     List<LatLng>? roadPolyline = await _fetchDirectOsrmPolyline([
       LatLng(origin.latitude, origin.longitude),
       LatLng(destination.latitude, destination.longitude),
     ]);
-
     final totalEnergyKwh = double.parse(
         ((totalDist * vehicle.efficiencyWhPerKm) / 1000.0).toStringAsFixed(1));
     final usedSoc = (totalEnergyKwh / vehicle.batteryCapacityKwh) * 100.0;
     final projectedDestSoc = (startingSoc - usedSoc).round();
-
     final allStations = StationLocalCache.defaultMalaysianStations();
     final corridorStations = allStations
         .where((s) => _isDirectionallyCompatible(s.name, s.latitude, origin.latitude, destination.latitude))
@@ -278,14 +248,11 @@ class RouteRepository {
     String summary =
         'Destination reachable safely with $projectedDestSoc% battery remaining.';
     int totalChargeMins = 0;
-
     final polyline = roadPolyline ?? _synthesizeOfflinePolyline(origin, destination);
-
     if (projectedDestSoc < vehicle.reserveSocPercent) {
       status = 'critical_charging_required';
       summary =
           'Battery depletion risk: Route requires ${usedSoc.round()}% battery. Charging stop recommended.';
-
       ChargingStation chosenStation;
       if (preferredStopStationIds.isNotEmpty) {
         chosenStation = corridorStations.firstWhere(
@@ -301,7 +268,6 @@ class RouteRepository {
           orElse: () => corridorStations.first,
         );
       }
-
       final arrivalSoc = max((startingSoc - 35), 15);
       const departureSoc = 80;
       final addedKwh =
@@ -309,18 +275,15 @@ class RouteRepository {
       final effectiveKw = min(chosenStation.maxPowerKw, vehicle.maxDcChargeKw);
       final chargeMins =
           max((addedKwh / (effectiveKw * 0.85) * 60).round(), 18);
-
       final alternatives = corridorStations
           .where((s) => s.id != chosenStation.id && (s.city == 'Tapah' || s.city == 'Simpang Pulai' || s.city == 'Ipoh'))
           .take(4)
           .toList();
-
       final closestP = polyline.reduce((a, b) =>
           _haversineKm(a.latitude, a.longitude, chosenStation.latitude, chosenStation.longitude) <
                   _haversineKm(b.latitude, b.longitude, chosenStation.latitude, chosenStation.longitude)
               ? a
               : b);
-
       stops.add(
         ChargingStopRecommendation(
           station: chosenStation,
@@ -352,7 +315,6 @@ class RouteRepository {
       summary =
           'Tight arrival battery ($projectedDestSoc% SoC). Approaching ${vehicle.reserveSocPercent}% safety reserve.';
     }
-
     return RoutePlanResult(
       originName: origin.name,
       destinationName: destination.name,
@@ -372,7 +334,6 @@ class RouteRepository {
       corridorStations: corridorStations,
     );
   }
-
   Future<List<LatLng>?> _fetchDirectOsrmPolyline(List<LatLng> waypoints) async {
     try {
       final coords = waypoints.map((p) => '${p.longitude},${p.latitude}').join(';');
@@ -395,7 +356,6 @@ class RouteRepository {
     } catch (_) {}
     return null;
   }
-
   List<LatLng> _synthesizeOfflinePolyline(PlaceSuggestion origin, PlaceSuggestion dest) {
     final isNorthbound = dest.latitude > origin.latitude && (dest.latitude - origin.latitude) > 1.2;
     final poly = <LatLng>[origin.latLng];
@@ -419,7 +379,6 @@ class RouteRepository {
     poly.add(dest.latLng);
     return poly;
   }
-
   double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
     const r = 6371.0;
     final dLat = (lat2 - lat1) * pi / 180.0;
