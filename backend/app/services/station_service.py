@@ -5,7 +5,7 @@ realistic Malaysian EV charging seed orchestration across states.
 """
 
 import math
-from uuid import UUID
+from uuid import NAMESPACE_DNS, UUID, uuid5
 
 from fastapi import HTTPException, status
 
@@ -141,6 +141,135 @@ class StationService:
         )
         created = await self.repository.create_station(persisted_data)
         return self._entity_to_dto(created)
+
+    @classmethod
+    def merge_osm_stations(
+        cls,
+        db_stations: list[StationRead],
+        osm_candidates: list[StationCreate],
+        filters: StationFilterParams,
+    ) -> list[StationRead]:
+        """Merge in-memory live OSM stations with DB stations, deduplicating within 150m."""
+        is_proximity = filters.lat is not None and filters.lng is not None
+        merged = list(db_stations)
+        existing_coords = [(s.latitude, s.longitude) for s in db_stations]
+
+        for cand in osm_candidates:
+            # 1. Viewport boundary check if specified
+            if (
+                filters.min_lat is not None
+                and filters.max_lat is not None
+                and not (filters.min_lat <= cand.latitude <= filters.max_lat)
+            ):
+                continue
+            if (
+                filters.min_lng is not None
+                and filters.max_lng is not None
+                and not (filters.min_lng <= cand.longitude <= filters.max_lng)
+            ):
+                continue
+
+            # 2. Proximity distance check
+            dist_km: float | None = None
+            if is_proximity and filters.lat is not None and filters.lng is not None:
+                dist_km = haversine_distance_km(
+                    filters.lat, filters.lng, cand.latitude, cand.longitude
+                )
+                if dist_km > filters.radius_km:
+                    continue
+
+            # 3. Power output filter
+            if filters.min_kw is not None and cand.max_power_kw < filters.min_kw:
+                continue
+
+            # 4. Connector type filter
+            if filters.connector_type is not None:
+                req_conn = filters.connector_type.lower()
+                if not any(p.type.lower() == req_conn for p in cand.plug_types):
+                    continue
+
+            # 5. Amenity filter
+            if filters.amenity is not None:
+                req_amenity = filters.amenity.lower()
+                if not any(req_amenity in a.lower() for a in cand.amenities):
+                    continue
+
+            # 6. Deduplicate against DB stations and already accepted candidates (150m tolerance)
+            # Exception: Do not deduplicate opposite-direction highway R&Rs across the highway median
+            is_dup = False
+            for existing_st in merged:
+                if (
+                    haversine_distance_km(
+                        cand.latitude, cand.longitude, existing_st.latitude, existing_st.longitude
+                    )
+                    < 0.15
+                ):
+                    c_name = (
+                        f"{cand.name} {cand.address}".lower()
+                        .replace("utara-selatan", "")
+                        .replace("utara\u2013selatan", "")
+                    )
+                    e_name = (
+                        f"{existing_st.name} {existing_st.address}".lower()
+                        .replace("utara-selatan", "")
+                        .replace("utara\u2013selatan", "")
+                    )
+                    c_nb = any(k in c_name for k in ("northbound", "arah utara"))
+                    c_sb = any(k in c_name for k in ("southbound", "arah selatan"))
+                    e_nb = any(k in e_name for k in ("northbound", "arah utara"))
+                    e_sb = any(k in e_name for k in ("southbound", "arah selatan"))
+                    if (c_nb and e_sb) or (c_sb and e_nb):
+                        continue
+                    is_dup = True
+                    break
+
+            if is_dup:
+                continue
+
+            # Convert to StationRead DTO
+            dto = cls._create_to_dto(cand)
+            if dist_km is not None:
+                dto.distance_km = round(dist_km, 2)
+
+            merged.append(dto)
+            existing_coords.append((cand.latitude, cand.longitude))
+
+        if is_proximity:
+            merged.sort(key=lambda s: s.distance_km if s.distance_km is not None else float("inf"))
+
+        return merged
+
+    @staticmethod
+    def _create_to_dto(station_in: StationCreate) -> StationRead:
+        """Convert a non-persisted StationCreate to StationRead DTO with a deterministic UUID."""
+        seed_key = f"{station_in.latitude:.6f}_{station_in.longitude:.6f}_{station_in.name}"
+        station_id = uuid5(NAMESPACE_DNS, seed_key)
+
+        return StationRead(
+            id=station_id,
+            name=station_in.name,
+            operator_name=station_in.operator_name,
+            address=station_in.address,
+            city=station_in.city,
+            state=station_in.state,
+            latitude=station_in.latitude,
+            longitude=station_in.longitude,
+            plug_types=station_in.plug_types,
+            max_power_kw=station_in.max_power_kw,
+            is_available=station_in.is_available,
+            is_24_hours=station_in.is_24_hours,
+            charging_cost_myr=station_in.charging_cost_myr,
+            parking_fee_myr=station_in.parking_fee_myr,
+            parking_level=station_in.parking_level,
+            operation_hours=station_in.operation_hours,
+            amenities=station_in.amenities or [],
+            how_to_access=station_in.how_to_access or [],
+            description=station_in.description,
+            rating=0.0,
+            review_count=0,
+            source=station_in.source or "osm_live",
+            is_verified=station_in.is_verified,
+        )
 
     @staticmethod
     def _entity_to_dto(entity: ChargingStation) -> StationRead:

@@ -9,14 +9,98 @@ import 'package:frontend/features/routing/presentation/route_planner_screen.dart
 import 'package:frontend/features/routing/presentation/widgets/charging_stop_tile.dart';
 import 'package:frontend/features/routing/presentation/widgets/route_search_card.dart';
 import 'package:frontend/features/routing/presentation/widgets/route_telemetry_card.dart';
+import 'package:frontend/features/stations/data/station_local_cache.dart';
 import 'package:frontend/features/stations/domain/station_model.dart';
 import 'package:frontend/features/vehicles/data/vehicle_repository.dart';
 import 'package:frontend/features/vehicles/domain/vehicle_model.dart';
 import 'package:frontend/features/vehicles/presentation/vehicle_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+const _kTestCorridorStations = [
+  ChargingStation(
+    id: 'stop-tapah',
+    name: 'TNB Electron Tapah R&R Northbound',
+    operatorName: 'TNB Electron',
+    address: 'PLUS Highway KM 332, Northbound',
+    city: 'Tapah',
+    state: 'Perak',
+    latitude: 4.3138,
+    longitude: 101.2582,
+    plugTypes: [PlugInfo(type: 'CCS2', powerKw: 180.0, count: 2)],
+    maxPowerKw: 180.0,
+    isAvailable: true,
+    is24Hours: true,
+    chargingCostMyr: 1.60,
+    parkingFeeMyr: 0.0,
+    parkingLevel: 'R&R Northbound Dedicated EV Bay',
+    operationHours: '24 Hours',
+    amenities: ['Dining', 'Restroom', 'Convenience Store', 'Surau', 'Petrol Station'],
+    howToAccess: [
+      AccessStep(stepNumber: 1, instruction: 'Exit PLUS highway at Tapah R&R Northbound rest stop.'),
+    ],
+    rating: 4.7,
+    reviewCount: 58,
+    source: 'community',
+    isVerified: true,
+  ),
+  ChargingStation(
+    id: 'alt-simpang-pulai',
+    name: 'Shell Recharge Simpang Pulai Layby Northbound',
+    operatorName: 'Shell Recharge',
+    address: 'North-South Expressway KM 290.4 Northbound, 31300 Simpang Pulai, Perak',
+    city: 'Simpang Pulai',
+    state: 'Perak',
+    latitude: 4.5162,
+    longitude: 101.1458,
+    plugTypes: [PlugInfo(type: 'CCS2', powerKw: 180.0, count: 2)],
+    maxPowerKw: 180.0,
+    isAvailable: true,
+    is24Hours: true,
+    chargingCostMyr: 1.60,
+    parkingFeeMyr: 0.0,
+    parkingLevel: 'Layby Northbound ParkEasy HPC Bay',
+    operationHours: '24 Hours',
+    amenities: ['Restroom', 'Petrol Station', 'Convenience Store'],
+    howToAccess: [
+      AccessStep(stepNumber: 1, instruction: 'Exit PLUS highway at Simpang Pulai Layby Northbound.'),
+    ],
+    rating: 4.7,
+    reviewCount: 45,
+    source: 'community',
+    isVerified: true,
+  ),
+  ChargingStation(
+    id: 'alt-ipoh-lost-world',
+    name: 'Ipoh Sunway Lost World JomCharge',
+    operatorName: 'JomCharge',
+    address: 'No. 1, Persiaran Lagun Sunway 1, 31150 Ipoh, Perak',
+    city: 'Ipoh',
+    state: 'Perak',
+    latitude: 4.6250,
+    longitude: 101.1550,
+    plugTypes: [PlugInfo(type: 'CCS2', powerKw: 120.0, count: 2)],
+    maxPowerKw: 120.0,
+    isAvailable: true,
+    is24Hours: true,
+    chargingCostMyr: 1.40,
+    parkingFeeMyr: 2.00,
+    parkingLevel: 'Open Carpark Zone A',
+    operationHours: '24 Hours',
+    amenities: ['Dining', 'Restroom', 'Theme Park', 'Hotel'],
+    howToAccess: [
+      AccessStep(stepNumber: 1, instruction: 'Enter Lost World visitor carpark.'),
+    ],
+    rating: 4.6,
+    reviewCount: 30,
+    source: 'community',
+    isVerified: true,
+  ),
+];
+
 void main() {
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    await StationLocalCache().saveStations(_kTestCorridorStations);
   });
   group('Route Models & Duration Formatting (KF10, KF14, Module 7.9)', () {
     test('formatDurationMinutes formats minutes into hours and minutes', () {
@@ -88,6 +172,9 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final notifier = container.read(routeControllerProvider.notifier);
+      final hubs = RouteRepository.defaultHubs;
+      notifier.setOrigin(hubs[0]);
+      notifier.setDestination(hubs[1]);
       await notifier.calculateRoute();
       final initialPlan = container.read(routeControllerProvider).currentPlan;
       expect(initialPlan, isNotNull);
@@ -104,7 +191,7 @@ void main() {
         destination: container.read(routeControllerProvider).destination,
         plan: updatedPlan,
       );
-      expect(googleMapsUrl, contains('${altStation.latitude}%2C${altStation.longitude}'));
+      expect(googleMapsUrl, contains('${altStation.latitude.toStringAsFixed(6)}%2C${altStation.longitude.toStringAsFixed(6)}'));
     });
     test('RouteRepository searchPlaces filters catalog and returns matches', () async {
       final repo = RouteRepository();
@@ -298,7 +385,7 @@ void main() {
       await tester.tap(find.byKey(const Key('telemetry_collapse_button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('collapsed_telemetry_bar')), findsOneWidget);
-      expect(find.text('35.0 km â€¢ 28m'), findsOneWidget);
+      expect(find.text('35.0 km • 28m'), findsOneWidget);
     });
     testWidgets('ChargingStopTile renders vicinity swap chip and opens bottom modal',
         (tester) async {

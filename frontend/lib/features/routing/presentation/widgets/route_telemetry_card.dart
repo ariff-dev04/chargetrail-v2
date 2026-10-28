@@ -96,7 +96,7 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${widget.plan.totalDistanceKm} km â€¢ ${formatDurationMinutes(widget.plan.totalTripMinutes)}',
+                      '${widget.plan.totalDistanceKm} km • ${formatDurationMinutes(widget.plan.totalTripMinutes)}',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -248,7 +248,7 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              'Active EV: ${vehicle.brand} ${vehicle.modelName} (${vehicle.batteryCapacityKwh.toStringAsFixed(0)} kWh â€¢ ${vehicle.connectorType} â€¢ ${vehicle.maxDcChargeKw.toStringAsFixed(0)}kW Max)',
+              'Active EV: ${vehicle.brand} ${vehicle.modelName} (${vehicle.batteryCapacityKwh.toStringAsFixed(0)} kWh • ${vehicle.connectorType} • ${vehicle.maxDcChargeKw.toStringAsFixed(0)}kW Max)',
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -301,15 +301,15 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
     if (widget.plan.isSafe) {
       bannerColor = AppTheme.successGreen;
       icon = Icons.shield;
-      title = 'Safe Range â€¢ No Charging Stops Required';
+      title = 'Safe Range • No Charging Stops Required';
     } else if (widget.plan.isWarning) {
       bannerColor = Colors.orange[800]!;
       icon = Icons.warning_amber_rounded;
-      title = 'Warning â€¢ Approaching Safety Reserve Buffer';
+      title = 'Warning • Approaching Safety Reserve Buffer';
     } else {
       bannerColor = const Color(0xFFDC2626);
       icon = Icons.battery_alert;
-      title = 'Critical â€¢ Highway Charging Stop Mandatory';
+      title = 'Critical • Highway Charging Stop Mandatory';
     }
     return Container(
       padding: const EdgeInsets.all(10),
@@ -390,19 +390,46 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
   }
   Widget _buildChargingStopsTimeline(BuildContext context, bool isDark) {
     if (widget.plan.recommendedStops.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.cardDark : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.check_circle_outline, color: AppTheme.successGreen, size: 16),
-            SizedBox(width: 8),
-            Text('Direct Route â€¢ No charging stops required', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-          ],
-        ),
+      final isDeficit = widget.plan.rangeAnxietyStatus == 'critical_charging_required' ||
+          widget.plan.finalArrivalSocPercent <= 0;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDeficit
+                  ? const Color(0xFFDC2626).withValues(alpha: isDark ? 0.2 : 0.1)
+                  : (isDark ? AppTheme.cardDark : Colors.grey.shade100),
+              borderRadius: BorderRadius.circular(10),
+              border: isDeficit ? Border.all(color: const Color(0xFFDC2626).withValues(alpha: 0.5)) : null,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isDeficit ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                  color: isDeficit ? const Color(0xFFDC2626) : AppTheme.successGreen,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isDeficit
+                        ? 'No compatible highway charger found on corridor — tap Edit or scan area'
+                        : 'Direct Route • No charging stops required',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDeficit ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C)) : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildDriverDisclaimer(isDark),
+        ],
       );
     }
     return Column(
@@ -427,7 +454,33 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
             stop: entry.value,
           );
         }),
+        _buildDriverDisclaimer(isDark),
       ],
+    );
+  }
+
+  Widget _buildDriverDisclaimer(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 14, color: AppTheme.primaryTeal),
+          SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Disclaimer: Route & charger locations are sourced from open community data (OpenStreetMap). Always verify highway direction (Northbound/Southbound R&R), charger availability, and parking access rules before navigating.',
+              style: TextStyle(fontSize: 10, color: Colors.grey, height: 1.3),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

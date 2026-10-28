@@ -51,8 +51,16 @@ async def list_stations(
     """Retrieve charging stations filtered by bounding box, radius, power, or amenities."""
     results = await service.get_stations(filters)
 
-    # If DB currently has 0 stations for the queried spatial bounds, auto-trigger live OSM harvest
-    if not results and (filters.min_lat is not None or filters.lat is not None):
+    # Trigger live OSM harvest whenever viewport bounding box or lat/lng proximity is provided
+    has_viewport = (
+        filters.min_lat is not None
+        and filters.max_lat is not None
+        and filters.min_lng is not None
+        and filters.max_lng is not None
+    )
+    has_proximity = filters.lat is not None and filters.lng is not None
+
+    if has_viewport or has_proximity:
         min_lat = (
             filters.min_lat
             if filters.min_lat is not None
@@ -73,19 +81,23 @@ async def list_stations(
             if filters.max_lng is not None
             else (filters.lng + (filters.radius_km / 111.0))
         )
-        c_lat = filters.lat or (min_lat + max_lat) / 2.0
-        c_lng = filters.lng or (min_lng + max_lng) / 2.0
+        c_lat = filters.lat if filters.lat is not None else (min_lat + max_lat) / 2.0
+        c_lng = filters.lng if filters.lng is not None else (min_lng + max_lng) / 2.0
 
-        await OsmHarvesterService.harvest_viewport(
-            repository=service.repository,
+        osm_candidates = await OsmHarvesterService.harvest_viewport(
             min_lat=min_lat,
             min_lng=min_lng,
             max_lat=max_lat,
             max_lng=max_lng,
             center_lat=c_lat,
             center_lng=c_lng,
+            persist=False,
         )
-        results = await service.get_stations(filters)
+        results = service.merge_osm_stations(
+            db_stations=results,
+            osm_candidates=osm_candidates,
+            filters=filters,
+        )
 
     return results
 
@@ -115,16 +127,19 @@ async def harvest_viewport(
     service: StationService = Depends(get_station_service),
 ) -> list[StationRead]:
     """Harvest live OpenStreetMap chargers in viewport and return persisted records."""
-    entities = await OsmHarvesterService.harvest_viewport(
-        repository=service.repository,
+    candidates = await OsmHarvesterService.harvest_viewport(
         min_lat=req.min_lat,
         min_lng=req.min_lng,
         max_lat=req.max_lat,
         max_lng=req.max_lng,
         center_lat=req.center_lat,
         center_lng=req.center_lng,
+        repository=service.repository,
+        persist=True,
     )
-    return [service._entity_to_dto(e) for e in entities]
+    if not candidates:
+        return []
+    return await service.upsert_batch_stations(candidates)
 
 
 @router.get(

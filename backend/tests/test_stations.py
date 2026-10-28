@@ -294,3 +294,78 @@ async def test_harvest_viewport_endpoint(async_client: AsyncClient) -> None:
     res = await async_client.post("/api/v1/stations/harvest-viewport", json=req_payload)
     assert res.status_code == 200
     assert isinstance(res.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_get_stations_viewport_does_not_persist_to_db_until_interaction(
+    async_client: AsyncClient,
+) -> None:
+    """Verify GET /stations with viewport merges live OSM stations without auto-saving to DB."""
+    from app.schemas.station import AccessStep, PlugInfo, StationCreate
+    from app.services.osm_harvester_service import OsmHarvesterService
+
+    # 1. Seed base 14 Malaysian stations
+    await async_client.post("/api/v1/stations/seed-sample")
+
+    # 2. Inject an in-memory OSM candidate into the harvester cache for cell
+    # Cell key for (3.15, 101.70) is "63_2034"
+    c_lat, c_lng = 3.15, 101.70
+    cell_key = f"{round(c_lat * 20)}_{round(c_lng * 20)}"
+    osm_mock_station = StationCreate(
+        name="InMemory Live OSM Charger - Test Bay",
+        operator_name="OSM Live Test Network",
+        address="Persiaran KLCC, Kuala Lumpur",
+        city="Kuala Lumpur",
+        state="Wilayah Persekutuan Kuala Lumpur",
+        latitude=3.1520,
+        longitude=101.7050,
+        plug_types=[PlugInfo(type="CCS2", power_kw=150.0, count=2)],
+        max_power_kw=150.0,
+        is_available=True,
+        is_24_hours=True,
+        charging_cost_myr=1.50,
+        parking_fee_myr=0.0,
+        parking_level="Open Surface",
+        operation_hours="24 Hours",
+        amenities=["Dining"],
+        how_to_access=[AccessStep(step_number=1, instruction="Access via main road.")],
+        source="osm_live",
+        is_verified=True,
+    )
+    OsmHarvesterService._harvest_cache[cell_key] = [osm_mock_station]
+
+    # 3. GET /stations with viewport bounds covering the cell
+    res = await async_client.get(
+        "/api/v1/stations",
+        params={
+            "min_lat": 3.10,
+            "max_lat": 3.20,
+            "min_lng": 101.65,
+            "max_lng": 101.75,
+        },
+    )
+    assert res.status_code == 200
+    viewport_stations = res.json()
+    names = [s["name"] for s in viewport_stations]
+    assert "InMemory Live OSM Charger - Test Bay" in names
+
+    # 4. Confirm the live OSM charger was NOT persisted to SQLite DB (unfiltered query still has only 14)
+    all_res = await async_client.get("/api/v1/stations")
+    assert all_res.status_code == 200
+    db_stations = all_res.json()
+    assert len(db_stations) == 14
+    assert "InMemory Live OSM Charger - Test Bay" not in [s["name"] for s in db_stations]
+
+    # 5. Interacting with the OSM station (upsert-external) persists it into DB
+    upsert_res = await async_client.post(
+        "/api/v1/stations/upsert-external",
+        json=osm_mock_station.model_dump(),
+    )
+    assert upsert_res.status_code == 200
+
+    # 6. Now the station is officially persisted in the DB
+    updated_db_res = await async_client.get("/api/v1/stations")
+    assert updated_db_res.status_code == 200
+    updated_db_stations = updated_db_res.json()
+    assert len(updated_db_stations) == 15
+    assert "InMemory Live OSM Charger - Test Bay" in [s["name"] for s in updated_db_stations]

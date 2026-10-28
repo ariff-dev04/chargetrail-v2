@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import '../../../auth/presentation/auth_controller.dart';
 import '../../../community/presentation/widgets/micro_survey_card.dart';
+import '../../../routing/presentation/navigation_launcher.dart';
 import '../../../vehicles/presentation/vehicle_controller.dart';
 import '../../domain/station_model.dart';
 
@@ -144,7 +145,11 @@ class StationDetailSheet extends StatelessWidget {
               const SizedBox(height: 12),
 
               FilledButton.icon(
-                onPressed: onNavigatePressed ?? () => Navigator.of(context).pop(),
+                onPressed: onNavigatePressed ??
+                    () {
+                      Navigator.of(context).pop();
+                      NavigationLauncher.showStationNavigationSheet(context, station);
+                    },
                 icon: const Icon(Icons.directions),
                 label: const Text('Navigate to Station'),
                 style: FilledButton.styleFrom(backgroundColor: AppTheme.primaryTeal, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),

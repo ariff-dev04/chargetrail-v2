@@ -132,10 +132,7 @@ class AuthNotifier extends Notifier<AuthState> {
       fullName: 'Ahmad Faiz (Demo)',
       phoneNumber: '+60123456789',
       preferredConnector: 'CCS2',
-      savedStationIds: [
-        '9ec6c0f7-48d9-48b1-ad1b-0e6a157fa1bf', // Suria KLCC
-        'c3d4e5f6-a1b2-4c3d-0e4f-5a6b7c8d9e0f', // Tapah RSA
-      ],
+      savedStationIds: [],
     );
     const demoToken = 'local-offline-demo-token';
     final repo = ref.read(authRepositoryProvider);

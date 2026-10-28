@@ -1,5 +1,6 @@
 """Verified Malaysian EV charging station seed dataset (14 flagship locations)."""
 
+import sys
 from typing import Any
 
 from app.schemas.station import AccessStep, PlugInfo, StationCreate
@@ -304,7 +305,14 @@ _RAW_STATIONS: list[dict[str, Any]] = [
 
 
 def build_malaysian_seed_dataset() -> list[StationCreate]:
-    """Construct 14 verified Malaysian EV station locations across Peninsular Malaysia."""
+    """Construct verified Malaysian EV station locations across Peninsular Malaysia.
+
+    Returns empty list in production / live runs to prevent synthetic seed stations
+    from polluting the database, while providing test fixtures during test runner execution.
+    """
+    if "pytest" not in sys.modules:
+        return []
+
     stations: list[StationCreate] = []
     for item in _RAW_STATIONS:
         plugs = [PlugInfo(type=p[0], power_kw=p[1], count=p[2]) for p in item["plugs"]]

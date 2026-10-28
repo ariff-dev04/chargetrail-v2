@@ -17,8 +17,8 @@ class StationRepository {
             Dio(
               BaseOptions(
                 baseUrl: baseUrl ?? ApiConfig.baseUrl,
-                connectTimeout: const Duration(seconds: 3),
-                receiveTimeout: const Duration(seconds: 3),
+                connectTimeout: const Duration(seconds: 8),
+                receiveTimeout: const Duration(seconds: 15),
               ),
             ),
         _localCache = localCache ?? StationLocalCache();

@@ -77,7 +77,6 @@ if ($portListening) {
 
 # 4. Seed Verified Malaysian EV Stations
 try {
-    $seedRes = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/stations/seed-sample" -TimeoutSec 4 -ErrorAction SilentlyContinue
     if ($seedRes) {
         $seedMsg = $seedRes.message
         Write-Host "UAT: Database Seeder: $seedMsg" -ForegroundColor Green

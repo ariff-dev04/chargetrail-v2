@@ -265,19 +265,22 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
             const SizedBox(height: 6),
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 140),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _suggestions.length,
-                itemBuilder: (ctx, i) {
-                  final item = _suggestions[i];
-                  return ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.place, size: 16, color: AppTheme.primaryTeal),
-                    title: Text(item.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                    subtitle: Text('${item.city}, ${item.state}', style: const TextStyle(fontSize: 10)),
-                    onTap: () => _selectSuggestion(item),
-                  );
-                },
+              child: Material(
+                color: Colors.transparent,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _suggestions.length,
+                  itemBuilder: (ctx, i) {
+                    final item = _suggestions[i];
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.place, size: 16, color: AppTheme.primaryTeal),
+                      title: Text(item.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      subtitle: Text('${item.city}, ${item.state}', style: const TextStyle(fontSize: 10)),
+                      onTap: () => _selectSuggestion(item),
+                    );
+                  },
+                ),
               ),
             ),
           ],

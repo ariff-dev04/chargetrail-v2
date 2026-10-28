@@ -103,19 +103,21 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
                   MarkerLayer(
                     markers: [
                       // Origin Pin (Green)
-                      Marker(
-                        point: state.origin.latLng,
-                        width: 32,
-                        height: 32,
-                        child: const Icon(Icons.trip_origin, color: AppTheme.successGreen, size: 24),
-                      ),
+                      if (state.selectedOrigin != null && state.selectedOrigin!.name.isNotEmpty)
+                        Marker(
+                          point: state.selectedOrigin!.latLng,
+                          width: 32,
+                          height: 32,
+                          child: const Icon(Icons.trip_origin, color: AppTheme.successGreen, size: 24),
+                        ),
                       // Destination Pin (Red)
-                      Marker(
-                        point: state.destination.latLng,
-                        width: 32,
-                        height: 32,
-                        child: const Icon(Icons.flag, color: Colors.red, size: 28),
-                      ),
+                      if (state.selectedDestination != null && state.selectedDestination!.name.isNotEmpty)
+                        Marker(
+                          point: state.selectedDestination!.latLng,
+                          width: 32,
+                          height: 32,
+                          child: const Icon(Icons.flag, color: Colors.red, size: 28),
+                        ),
                       // Corridor Vicinity Chargers (Compact Teal EV Pins)
                       ...plan.corridorStations
                           .where((cs) => !plan.recommendedStops.any((rs) => rs.station.id == cs.id))

@@ -7,8 +7,8 @@ import '../domain/route_models.dart';
 
 /// State representation for journey route planning and battery simulation.
 class RouteState {
-  final PlaceSuggestion origin;
-  final PlaceSuggestion destination;
+  final PlaceSuggestion? selectedOrigin;
+  final PlaceSuggestion? selectedDestination;
   final int startingSocPercent;
   final RoutePlanResult? currentPlan;
   final List<String> preferredStopIds;
@@ -16,30 +16,73 @@ class RouteState {
   final String? errorMessage;
 
   const RouteState({
-    required this.origin,
-    required this.destination,
+    PlaceSuggestion? selectedOrigin,
+    PlaceSuggestion? selectedDestination,
+    PlaceSuggestion? origin,
+    PlaceSuggestion? destination,
     this.startingSocPercent = 55,
     this.currentPlan,
     this.preferredStopIds = const [],
     this.isLoading = false,
     this.errorMessage,
-  });
+  })  : selectedOrigin = selectedOrigin ?? origin,
+        selectedDestination = selectedDestination ?? destination;
+
+  /// Convenient accessor returning selectedOrigin or an empty PlaceSuggestion placeholder.
+  PlaceSuggestion get origin =>
+      selectedOrigin ??
+      const PlaceSuggestion(
+        name: '',
+        city: '',
+        state: '',
+        latitude: 0.0,
+        longitude: 0.0,
+      );
+
+  /// Convenient accessor returning selectedDestination or an empty PlaceSuggestion placeholder.
+  PlaceSuggestion get destination =>
+      selectedDestination ??
+      const PlaceSuggestion(
+        name: '',
+        city: '',
+        state: '',
+        latitude: 0.0,
+        longitude: 0.0,
+      );
+
+  bool get hasValidEndpoints =>
+      selectedOrigin != null &&
+      selectedOrigin!.name.isNotEmpty &&
+      selectedDestination != null &&
+      selectedDestination!.name.isNotEmpty;
 
   RouteState copyWith({
+    PlaceSuggestion? selectedOrigin,
+    bool clearSelectedOrigin = false,
+    PlaceSuggestion? selectedDestination,
+    bool clearSelectedDestination = false,
     PlaceSuggestion? origin,
     PlaceSuggestion? destination,
     int? startingSocPercent,
     RoutePlanResult? currentPlan,
+    bool clearCurrentPlan = false,
     List<String>? preferredStopIds,
     bool? isLoading,
     String? errorMessage,
     bool clearErrorMessage = false,
   }) {
+    final newOrigin = clearSelectedOrigin
+        ? null
+        : (selectedOrigin ?? origin ?? this.selectedOrigin);
+    final newDestination = clearSelectedDestination
+        ? null
+        : (selectedDestination ?? destination ?? this.selectedDestination);
+
     return RouteState(
-      origin: origin ?? this.origin,
-      destination: destination ?? this.destination,
+      selectedOrigin: newOrigin,
+      selectedDestination: newDestination,
       startingSocPercent: startingSocPercent ?? this.startingSocPercent,
-      currentPlan: currentPlan ?? this.currentPlan,
+      currentPlan: clearCurrentPlan ? null : (currentPlan ?? this.currentPlan),
       preferredStopIds: preferredStopIds ?? this.preferredStopIds,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
@@ -63,15 +106,12 @@ class RouteNotifier extends Notifier<RouteState> {
       _disposed = true;
     });
 
-    final hubs = RouteRepository.defaultHubs;
-    final defaultOrigin = hubs[0]; // Kuala Lumpur (KLCC)
-    final defaultDest = hubs[1]; // Penang (Gurney Plaza)
-
-    state = RouteState(
-      origin: defaultOrigin,
-      destination: defaultDest,
+    state = const RouteState(
+      selectedOrigin: null,
+      selectedDestination: null,
       startingSocPercent: 55,
-      isLoading: true,
+      currentPlan: null,
+      isLoading: false,
     );
 
     ref.listen<VehicleState>(vehicleControllerProvider, (prev, next) {
@@ -79,41 +119,61 @@ class RouteNotifier extends Notifier<RouteState> {
           prev?.activeVehicle.batteryCapacityKwh != next.activeVehicle.batteryCapacityKwh ||
           prev?.activeVehicle.efficiencyWhPerKm != next.activeVehicle.efficiencyWhPerKm ||
           prev?.activeVehicle.maxDcChargeKw != next.activeVehicle.maxDcChargeKw) {
-        calculateRoute();
+        if (state.hasValidEndpoints) {
+          calculateRoute();
+        }
       }
     });
 
-    Future.microtask(() => calculateRoute());
     return state;
   }
 
   /// Update departure origin landmark.
   void setOrigin(PlaceSuggestion origin, {bool recalculate = false}) {
-    state = state.copyWith(origin: origin, preferredStopIds: const []);
-    if (recalculate) calculateRoute();
+    state = state.copyWith(
+      selectedOrigin: origin,
+      clearSelectedOrigin: origin.name.isEmpty,
+      preferredStopIds: const [],
+    );
+    if (recalculate && state.hasValidEndpoints) {
+      calculateRoute();
+    }
   }
 
   /// Update arrival destination landmark.
   void setDestination(PlaceSuggestion dest, {bool recalculate = false}) {
-    state = state.copyWith(destination: dest, preferredStopIds: const []);
-    if (recalculate) calculateRoute();
+    state = state.copyWith(
+      selectedDestination: dest,
+      clearSelectedDestination: dest.name.isEmpty,
+      preferredStopIds: const [],
+    );
+    if (recalculate && state.hasValidEndpoints) {
+      calculateRoute();
+    }
   }
 
   /// Swap origin and destination endpoints.
   void swapOriginDestination({bool recalculate = false}) {
-    final oldOrigin = state.origin;
+    final oldOrigin = state.selectedOrigin;
+    final oldDest = state.selectedDestination;
     state = state.copyWith(
-      origin: state.destination,
-      destination: oldOrigin,
+      selectedOrigin: oldDest,
+      selectedDestination: oldOrigin,
+      clearSelectedOrigin: oldDest == null,
+      clearSelectedDestination: oldOrigin == null,
       preferredStopIds: const [],
     );
-    if (recalculate) calculateRoute();
+    if (recalculate && state.hasValidEndpoints) {
+      calculateRoute();
+    }
   }
 
   /// Update simulated battery State of Charge at departure.
   void setStartingSoc(int soc, {bool recalculate = false}) {
     state = state.copyWith(startingSocPercent: soc.clamp(10, 100));
-    if (recalculate) calculateRoute();
+    if (recalculate && state.hasValidEndpoints) {
+      calculateRoute();
+    }
   }
 
   /// Search places via repository.
@@ -128,8 +188,8 @@ class RouteNotifier extends Notifier<RouteState> {
     required int startingSoc,
   }) {
     state = state.copyWith(
-      origin: origin,
-      destination: destination,
+      selectedOrigin: origin,
+      selectedDestination: destination,
       startingSocPercent: startingSoc,
       preferredStopIds: const [],
     );
@@ -205,14 +265,19 @@ class RouteNotifier extends Notifier<RouteState> {
 
   /// Trigger route simulation with active EV profile and starting battery percentage.
   Future<void> calculateRoute() async {
+    if (!state.hasValidEndpoints) {
+      state = state.copyWith(isLoading: false, clearCurrentPlan: true);
+      return;
+    }
+
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
       final repo = ref.read(routeRepositoryProvider);
       final activeVehicle = ref.read(vehicleControllerProvider).activeVehicle;
 
       final plan = await repo.calculateRoutePlan(
-        origin: state.origin,
-        destination: state.destination,
+        origin: state.selectedOrigin!,
+        destination: state.selectedDestination!,
         vehicle: activeVehicle,
         startingSocPercent: state.startingSocPercent,
         preferredStopStationIds: state.preferredStopIds,

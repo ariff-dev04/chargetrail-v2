@@ -30,20 +30,55 @@ class NearbyStationsCarousel extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(
-                  '📍 Nearby Chargers (${stations.length})',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.cardDark : Colors.white.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.location_on_rounded,
+                      size: 16,
+                      color: AppTheme.primaryTeal,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Nearby Chargers (${stations.length})',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
               InkWell(
                 onTap: () => _openFullNearbySheet(context),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  child: Row(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.cardDark : Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         'View List',
@@ -180,22 +215,25 @@ class NearbyStationsCarousel extends StatelessWidget {
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppTheme.primaryTeal.withValues(alpha: 0.12),
-                      child: Text(
-                        '${dist.toStringAsFixed(1)}km',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppTheme.primaryTeal.withValues(alpha: 0.12),
+                        child: Text(
+                          '${dist.toStringAsFixed(1)}km',
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal),
+                        ),
                       ),
+                      title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      subtitle: Text('${s.maxPowerKw.toInt()} kW • ${s.city} • ${isOpen ? "Open Data" : "Verified"}', style: const TextStyle(fontSize: 11)),
+                      trailing: const Icon(Icons.chevron_right, size: 18),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        onStationTap(s);
+                        StationDetailSheet.show(context, s);
+                      },
                     ),
-                    title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    subtitle: Text('${s.maxPowerKw.toInt()} kW • ${s.city} • ${isOpen ? "Open Data" : "Verified"}', style: const TextStyle(fontSize: 11)),
-                    trailing: const Icon(Icons.chevron_right, size: 18),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      onStationTap(s);
-                      StationDetailSheet.show(context, s);
-                    },
                   ),
                 );
               },

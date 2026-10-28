@@ -21,15 +21,30 @@ class MapDiscoveryScreen extends ConsumerStatefulWidget {
 
 class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
   final MapController _mapController = MapController();
-  static const LatLng _kDefaultCenter = LatLng(3.1578, 101.7118);
+  static const LatLng _kDefaultCenter = LatLng(4.2105, 101.9758);
+  static const double _kDefaultZoom = 6.5;
+  bool _hasCenteredOnUser = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final stState = ref.read(stationControllerProvider);
+      if (!_hasCenteredOnUser && stState.userLat != null && stState.userLng != null) {
+        _hasCenteredOnUser = true;
+        _centerMap(LatLng(stState.userLat!, stState.userLng!), 14.0);
+      }
+    });
+  }
 
   void _centerMap(LatLng target, [double zoom = 14.0]) => _mapController.move(target, zoom);
 
   Future<void> _handleMyLocation() async {
     final loc = await LocationService().determinePosition();
     ref.read(userLocationProvider.notifier).setLocation(loc);
-    ref.read(stationControllerProvider.notifier).updateReferenceLocation(loc.latitude, loc.longitude);
-    _centerMap(loc.latLng, 14.5);
+    ref.read(stationControllerProvider.notifier).updateUserLocation(loc.latitude, loc.longitude);
+    _centerMap(loc.latLng, 14.0);
 
     // Auto-discover nearby open EV chargers around physical GPS
     ref.read(stationControllerProvider.notifier).scanOsmViewport(
@@ -63,6 +78,7 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
           minLng: bounds.southWest.longitude,
           maxLat: bounds.northEast.latitude,
           maxLng: bounds.northEast.longitude,
+          forceRefresh: true,
         );
 
     if (mounted) {
@@ -88,12 +104,52 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
     final userLoc = ref.watch(userLocationProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    ref.listen<StationState>(stationControllerProvider, (previous, next) {
+      if (!_hasCenteredOnUser && next.userLat != null && next.userLng != null) {
+        _hasCenteredOnUser = true;
+        final target = LatLng(next.userLat!, next.userLng!);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _centerMap(target, 14.0);
+            notifier.scanOsmViewport(
+              centerLat: target.latitude,
+              centerLng: target.longitude,
+              minLat: target.latitude - 0.08,
+              minLng: target.longitude - 0.08,
+              maxLat: target.latitude + 0.08,
+              maxLng: target.longitude + 0.08,
+            );
+          }
+        });
+      }
+    });
+
     return Scaffold(
       body: Stack(
         children: [
           FlutterMap(
             mapController: _mapController,
-            options: const MapOptions(initialCenter: _kDefaultCenter, initialZoom: 12.0, minZoom: 5.0, maxZoom: 18.0),
+            options: MapOptions(
+              initialCenter: _kDefaultCenter,
+              initialZoom: _kDefaultZoom,
+              minZoom: 5.0,
+              maxZoom: 18.0,
+              onMapEvent: (event) {
+                if (event is MapEventMoveEnd) {
+                  final center = _mapController.camera.center;
+                  final bounds = _mapController.camera.visibleBounds;
+                  ref.read(stationControllerProvider.notifier).updateReferenceLocation(center.latitude, center.longitude);
+                  ref.read(stationControllerProvider.notifier).scanOsmViewport(
+                        centerLat: center.latitude,
+                        centerLng: center.longitude,
+                        minLat: bounds.southWest.latitude,
+                        minLng: bounds.southWest.longitude,
+                        maxLat: bounds.northEast.latitude,
+                        maxLng: bounds.northEast.longitude,
+                      );
+                }
+              },
+            ),
             children: [
               TileLayer(urlTemplate: mapStyle.urlTemplate, userAgentPackageName: 'my.ukm.chargetrail.v2'),
               MarkerLayer(

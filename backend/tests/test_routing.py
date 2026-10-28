@@ -174,3 +174,160 @@ async def test_route_planning_with_garage_vehicle_override(async_client: AsyncCl
     assert res.status_code == 200
     plan = res.json()
     assert "Tesla Model 3 Long Range AWD" in plan["vehicle_summary"]
+
+
+@pytest.mark.asyncio
+async def test_route_corridor_discovers_live_osm_without_db_seeds(
+    async_client: AsyncClient,
+) -> None:
+    """Verify route corridor planning discovers live OSM chargers even with 0 seeded DB stations."""
+    from app.schemas.station import AccessStep, PlugInfo, StationCreate
+    from app.services.osm_harvester_service import OsmHarvesterService
+
+    # Inject mock live OSM station along North-South highway into harvest cache
+    # Center of KL to Penang corridor is ~ (4.3, 101.0), cell key round(4.3*20)_round(101.0*20) = "86_2020"
+    mock_corridor_osm = StationCreate(
+        name="Live Overpass Highway Corridor Charger",
+        operator_name="OSM Live Route Network",
+        address="PLUS Expressway KM 300, Perak",
+        city="Tapah",
+        state="Perak",
+        latitude=4.3138,
+        longitude=101.2582,
+        plug_types=[PlugInfo(type="CCS2", power_kw=150.0, count=2)],
+        max_power_kw=150.0,
+        is_available=True,
+        is_24_hours=True,
+        charging_cost_myr=1.50,
+        parking_fee_myr=0.0,
+        parking_level="Open Rest Area",
+        operation_hours="24 Hours",
+        amenities=["Restroom", "Dining"],
+        how_to_access=[AccessStep(step_number=1, instruction="Highway rest area EV bay.")],
+        source="osm_live",
+        is_verified=True,
+    )
+
+    # Pre-populate harvest cache for corridor bounding box center
+    c_lat = (3.1578 + 5.4372) / 2.0
+    c_lng = (101.7118 + 100.3096) / 2.0
+    cell_key = f"{round(c_lat * 20)}_{round(c_lng * 20)}"
+    OsmHarvesterService._harvest_cache[cell_key] = [mock_corridor_osm]
+
+    payload = {
+        "origin_name": "Kuala Lumpur (KLCC)",
+        "origin_lat": 3.1578,
+        "origin_lng": 101.7118,
+        "destination_name": "Penang (Gurney Plaza)",
+        "destination_lat": 5.4372,
+        "destination_lng": 100.3096,
+        "starting_soc_percent": 50,
+        "battery_capacity_kwh": 60.48,
+        "efficiency_wh_per_km": 144.0,
+        "max_dc_charge_kw": 88.0,
+        "reserve_soc_percent": 15,
+        "corridor_radius_km": 25.0,
+    }
+
+    res = await async_client.post("/api/v1/routing/plan", json=payload)
+    assert res.status_code == 200
+    plan = res.json()
+
+    corridor_station_names = [s["name"] for s in plan["corridor_stations"]]
+    assert "Live Overpass Highway Corridor Charger" in corridor_station_names
+
+    # Recommended stop should utilize the live OSM charger
+    assert len(plan["recommended_stops"]) >= 1
+    rec_names = [s["station"]["name"] for s in plan["recommended_stops"]]
+    assert "Live Overpass Highway Corridor Charger" in rec_names
+
+    # Verify charger was NOT persisted to SQLite during route planning
+    stations_res = await async_client.get("/api/v1/stations")
+    persisted_names = [s["name"] for s in stations_res.json()]
+    assert "Live Overpass Highway Corridor Charger" not in persisted_names
+
+
+@pytest.mark.asyncio
+async def test_northbound_trip_strictly_rejects_southbound_r_and_r(
+    async_client: AsyncClient,
+) -> None:
+    """Verify Northbound trip strictly rejects Southbound/Arah Selatan R&Rs and selects Northbound."""
+    from app.schemas.station import AccessStep, PlugInfo, StationCreate
+    from app.services.osm_harvester_service import OsmHarvesterService
+
+    # Provide two stations at Tapah: one Northbound, one Southbound
+    southbound_st = StationCreate(
+        name="TNB Electron Tapah R&R Southbound (Arah Selatan)",
+        operator_name="TNB Electron",
+        address="PLUS Expressway KM 332 Southbound, Tapah, Perak",
+        city="Tapah",
+        state="Perak",
+        latitude=4.3140,
+        longitude=101.2580,
+        plug_types=[PlugInfo(type="CCS2", power_kw=180.0, count=2)],
+        max_power_kw=180.0,
+        is_available=True,
+        is_24_hours=True,
+        charging_cost_myr=1.50,
+        parking_fee_myr=0.0,
+        parking_level="Highway R&R / Open Bay",
+        operation_hours="24 Hours",
+        amenities=["Restroom", "Dining"],
+        how_to_access=[AccessStep(step_number=1, instruction="Southbound bay.")],
+        source="osm_live",
+        is_verified=True,
+    )
+
+    northbound_st = StationCreate(
+        name="TNB Electron Tapah R&R Northbound (Arah Utara)",
+        operator_name="TNB Electron",
+        address="PLUS Expressway KM 332 Northbound, Tapah, Perak",
+        city="Tapah",
+        state="Perak",
+        latitude=4.3138,
+        longitude=101.2582,
+        plug_types=[PlugInfo(type="CCS2", power_kw=180.0, count=2)],
+        max_power_kw=180.0,
+        is_available=True,
+        is_24_hours=True,
+        charging_cost_myr=1.50,
+        parking_fee_myr=0.0,
+        parking_level="Highway R&R / Open Bay",
+        operation_hours="24 Hours",
+        amenities=["Restroom", "Dining"],
+        how_to_access=[AccessStep(step_number=1, instruction="Northbound bay.")],
+        source="osm_live",
+        is_verified=True,
+    )
+
+    c_lat = (3.1578 + 5.4372) / 2.0
+    c_lng = (101.7118 + 100.3096) / 2.0
+    cell_key = f"{round(c_lat * 20)}_{round(c_lng * 20)}"
+    OsmHarvesterService._harvest_cache[cell_key] = [southbound_st, northbound_st]
+
+    payload = {
+        "origin_name": "Kuala Lumpur (KLCC)",
+        "origin_lat": 3.1578,
+        "origin_lng": 101.7118,
+        "destination_name": "Penang (Gurney Plaza)",
+        "destination_lat": 5.4372,
+        "destination_lng": 100.3096,
+        "starting_soc_percent": 50,
+        "battery_capacity_kwh": 60.48,
+        "efficiency_wh_per_km": 144.0,
+        "max_dc_charge_kw": 88.0,
+        "reserve_soc_percent": 15,
+        "corridor_radius_km": 25.0,
+    }
+
+    res = await async_client.post("/api/v1/routing/plan", json=payload)
+    assert res.status_code == 200
+    plan = res.json()
+
+    corridor_names = [s["name"] for s in plan["corridor_stations"]]
+    assert "TNB Electron Tapah R&R Northbound (Arah Utara)" in corridor_names
+    assert "TNB Electron Tapah R&R Southbound (Arah Selatan)" not in corridor_names
+
+    rec_names = [s["station"]["name"] for s in plan["recommended_stops"]]
+    assert "TNB Electron Tapah R&R Northbound (Arah Utara)" in rec_names
+    assert "TNB Electron Tapah R&R Southbound (Arah Selatan)" not in rec_names

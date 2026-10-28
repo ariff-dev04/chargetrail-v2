@@ -14,8 +14,8 @@ class RouteRepository {
             Dio(
               BaseOptions(
                 baseUrl: baseUrl ?? ApiConfig.baseUrl,
-                connectTimeout: const Duration(seconds: 4),
-                receiveTimeout: const Duration(seconds: 4),
+                connectTimeout: const Duration(seconds: 8),
+                receiveTimeout: const Duration(seconds: 20),
               ),
             );
   static List<PlaceSuggestion> get defaultHubs => const [
@@ -149,28 +149,52 @@ class RouteRepository {
     return results.take(8).toList();
   }
   Future<List<PlaceSuggestion>> fetchPlaces(String query) => searchPlaces(query);
-  bool _isDirectionallyCompatible(
-    String stationName,
-    double stationLat,
-    double originLat,
-    double destLat,
-  ) {
-    final lower = stationName.toLowerCase();
-    if (destLat - originLat > 0.15) {
-      if (lower.contains('southbound') || lower.contains('arah selatan')) {
-        return false;
-      }
-      if (stationLat < originLat - 0.05 || stationLat > destLat + 0.05) {
-        return false;
-      }
-    } else if (originLat - destLat > 0.15) {
-      if (lower.contains('northbound') || lower.contains('arah utara')) {
-        return false;
-      }
-      if (stationLat > originLat + 0.05 || stationLat < destLat - 0.05) {
-        return false;
-      }
+  static const _northboundKeywords = ['northbound', 'north bound', ' nb', 'arah utara', 'utara'];
+  static const _southboundKeywords = ['southbound', 'south bound', ' sb', 'arah selatan', 'selatan'];
+  static const _eastboundKeywords = ['eastbound', 'east bound', ' eb', 'arah timur', 'timur'];
+  static const _westboundKeywords = ['westbound', 'west bound', ' wb', 'arah barat', 'barat'];
+
+  static bool _hasKeyword(String text, List<String> keywords) {
+    return keywords.any((kw) => text.contains(kw));
+  }
+
+  bool _isDirectionallyCompatible({
+    required String stationName,
+    required String stationAddress,
+    required double stationLat,
+    required double stationLng,
+    required double originLat,
+    required double destLat,
+    double? originLng,
+    double? destLng,
+  }) {
+    final text = '$stationName $stationAddress'.toLowerCase();
+    final hasNb = _hasKeyword(text, _northboundKeywords);
+    final hasSb = _hasKeyword(text, _southboundKeywords);
+    final hasEb = _hasKeyword(text, _eastboundKeywords);
+    final hasWb = _hasKeyword(text, _westboundKeywords);
+
+    final dLat = destLat - originLat;
+    final dLng = (destLng != null && originLng != null) ? (destLng - originLng) : 0.0;
+
+    // North / South hard exclusion
+    if (dLat > 0.0005) {
+      if (hasSb && !hasNb) return false;
+    } else if (dLat < -0.0005) {
+      if (hasNb && !hasSb) return false;
     }
+
+    // East / West hard exclusion
+    if (dLng > 0.0005) {
+      if (hasWb && !hasEb) return false;
+    } else if (dLng < -0.0005) {
+      if (hasEb && !hasWb) return false;
+    }
+
+    final minLat = min(originLat, destLat) - 0.05;
+    final maxLat = max(originLat, destLat) + 0.05;
+    if (stationLat < minLat || stationLat > maxLat) return false;
+
     return true;
   }
   Future<RoutePlanResult> calculateRoutePlan({
@@ -238,9 +262,18 @@ class RouteRepository {
         ((totalDist * vehicle.efficiencyWhPerKm) / 1000.0).toStringAsFixed(1));
     final usedSoc = (totalEnergyKwh / vehicle.batteryCapacityKwh) * 100.0;
     final projectedDestSoc = (startingSoc - usedSoc).round();
-    final allStations = StationLocalCache.defaultMalaysianStations();
+    final allStations = await StationLocalCache().getCachedStations();
     final corridorStations = allStations
-        .where((s) => _isDirectionallyCompatible(s.name, s.latitude, origin.latitude, destination.latitude))
+        .where((s) => _isDirectionallyCompatible(
+              stationName: s.name,
+              stationAddress: s.address,
+              stationLat: s.latitude,
+              stationLng: s.longitude,
+              originLat: origin.latitude,
+              destLat: destination.latitude,
+              originLng: origin.longitude,
+              destLng: destination.longitude,
+            ))
         .toList();
     final stops = <ChargingStopRecommendation>[];
     int finalArrivalSoc = projectedDestSoc;
@@ -253,21 +286,22 @@ class RouteRepository {
       status = 'critical_charging_required';
       summary =
           'Battery depletion risk: Route requires ${usedSoc.round()}% battery. Charging stop recommended.';
-      ChargingStation chosenStation;
-      if (preferredStopStationIds.isNotEmpty) {
-        chosenStation = corridorStations.firstWhere(
-          (s) => preferredStopStationIds.contains(s.id),
-          orElse: () => corridorStations.firstWhere(
+      if (corridorStations.isNotEmpty) {
+        ChargingStation chosenStation;
+        if (preferredStopStationIds.isNotEmpty) {
+          chosenStation = corridorStations.firstWhere(
+            (s) => preferredStopStationIds.contains(s.id),
+            orElse: () => corridorStations.firstWhere(
+              (s) => s.name.contains('Tapah'),
+              orElse: () => corridorStations.first,
+            ),
+          );
+        } else {
+          chosenStation = corridorStations.firstWhere(
             (s) => s.name.contains('Tapah'),
             orElse: () => corridorStations.first,
-          ),
-        );
-      } else {
-        chosenStation = corridorStations.firstWhere(
-          (s) => s.name.contains('Tapah'),
-          orElse: () => corridorStations.first,
-        );
-      }
+          );
+        }
       final arrivalSoc = max((startingSoc - 35), 15);
       const departureSoc = 80;
       final addedKwh =
@@ -275,10 +309,43 @@ class RouteRepository {
       final effectiveKw = min(chosenStation.maxPowerKw, vehicle.maxDcChargeKw);
       final chargeMins =
           max((addedKwh / (effectiveKw * 0.85) * 60).round(), 18);
-      final alternatives = corridorStations
-          .where((s) => s.id != chosenStation.id && (s.city == 'Tapah' || s.city == 'Simpang Pulai' || s.city == 'Ipoh'))
-          .take(4)
-          .toList();
+      final alternatives = corridorStations.where((s) {
+        if (s.id == chosenStation.id) return false;
+        final distFromChosen = _haversineKm(
+          chosenStation.latitude,
+          chosenStation.longitude,
+          s.latitude,
+          s.longitude,
+        );
+        if (distFromChosen > 28.0) return false;
+
+        final detourFromPoly = polyline
+            .map((p) => _haversineKm(p.latitude, p.longitude, s.latitude, s.longitude))
+            .fold(double.infinity, min);
+        return detourFromPoly <= 5.0;
+      }).toList();
+
+      alternatives.sort((a, b) {
+        final aText = '${a.name} ${a.parkingLevel}'.toLowerCase();
+        final bText = '${b.name} ${b.parkingLevel}'.toLowerCase();
+        final aIsRR = aText.contains('r&r') ||
+            aText.contains('rsa') ||
+            aText.contains('layby') ||
+            aText.contains('open');
+        final bIsRR = bText.contains('r&r') ||
+            bText.contains('rsa') ||
+            bText.contains('layby') ||
+            bText.contains('open');
+        if (aIsRR != bIsRR) return aIsRR ? -1 : 1;
+
+        final aDetour = polyline
+            .map((p) => _haversineKm(p.latitude, p.longitude, a.latitude, a.longitude))
+            .fold(double.infinity, min);
+        final bDetour = polyline
+            .map((p) => _haversineKm(p.latitude, p.longitude, b.latitude, b.longitude))
+            .fold(double.infinity, min);
+        return aDetour.compareTo(bDetour);
+      });
       final closestP = polyline.reduce((a, b) =>
           _haversineKm(a.latitude, a.longitude, chosenStation.latitude, chosenStation.longitude) <
                   _haversineKm(b.latitude, b.longitude, chosenStation.latitude, chosenStation.longitude)
@@ -310,6 +377,7 @@ class RouteRepository {
             .round(),
         20,
       );
+      }
     } else if (projectedDestSoc < vehicle.reserveSocPercent + 10) {
       status = 'warning';
       summary =
@@ -364,6 +432,8 @@ class RouteRepository {
         LatLng(3.3217, 101.5767), // Rawang
         LatLng(3.7250, 101.4800), // Tg Malim
         LatLng(4.1950, 101.2789), // Tapah RSA
+        LatLng(4.3138, 101.2582), // Tapah R&R
+        LatLng(4.5162, 101.1458), // Simpang Pulai
         LatLng(4.5975, 101.0760), // Ipoh
         LatLng(4.8517, 100.7417), // Taiping
       ]);

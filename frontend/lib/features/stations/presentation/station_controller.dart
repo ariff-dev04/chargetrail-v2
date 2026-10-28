@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/services/location_service.dart';
 import '../data/osm_overpass_service.dart';
 import '../data/station_local_cache.dart';
 import '../data/station_repository.dart';
@@ -13,6 +14,8 @@ class StationState {
   final ChargingStation? selectedStation;
   final double referenceLat;
   final double referenceLng;
+  final double? userLat;
+  final double? userLng;
   final bool isLoading;
   final bool isOfflineMode;
   final String? errorMessage;
@@ -22,8 +25,10 @@ class StationState {
     this.filteredStations = const [],
     this.activeFilter = const StationFilter(),
     this.selectedStation,
-    this.referenceLat = 3.1578,
-    this.referenceLng = 101.7118,
+    this.referenceLat = 4.2105,
+    this.referenceLng = 101.9758,
+    this.userLat,
+    this.userLng,
     this.isLoading = false,
     this.isOfflineMode = false,
     this.errorMessage,
@@ -55,6 +60,10 @@ class StationState {
     bool clearSelectedStation = false,
     double? referenceLat,
     double? referenceLng,
+    double? userLat,
+    bool clearUserLat = false,
+    double? userLng,
+    bool clearUserLng = false,
     bool? isLoading,
     bool? isOfflineMode,
     String? errorMessage,
@@ -69,6 +78,8 @@ class StationState {
           : (selectedStation ?? this.selectedStation),
       referenceLat: referenceLat ?? this.referenceLat,
       referenceLng: referenceLng ?? this.referenceLng,
+      userLat: clearUserLat ? null : (userLat ?? this.userLat),
+      userLng: clearUserLng ? null : (userLng ?? this.userLng),
       isLoading: isLoading ?? this.isLoading,
       isOfflineMode: isOfflineMode ?? this.isOfflineMode,
       errorMessage: clearErrorMessage
@@ -88,8 +99,61 @@ class StationNotifier extends Notifier<StationState> {
   @override
   StationState build() {
     state = const StationState(isLoading: true);
-    Future.microtask(() => loadStations());
+    Future.microtask(() => _initializeWithGps());
     return state;
+  }
+
+  /// Acquire real device GPS first, then load and harvest viewport stations.
+  Future<void> _initializeWithGps() async {
+    double? realLat;
+    double? realLng;
+
+    try {
+      final loc = await LocationService().determinePosition();
+      if (loc.latitude >= -90.0 &&
+          loc.latitude <= 90.0 &&
+          loc.longitude >= -180.0 &&
+          loc.longitude <= 180.0) {
+        realLat = loc.latitude;
+        realLng = loc.longitude;
+      }
+    } catch (_) {}
+
+    if (realLat != null && realLng != null) {
+      state = state.copyWith(
+        userLat: realLat,
+        userLng: realLng,
+        referenceLat: realLat,
+        referenceLng: realLng,
+      );
+
+      const delta = 0.15;
+      await loadStations(
+        minLat: realLat - delta,
+        minLng: realLng - delta,
+        maxLat: realLat + delta,
+        maxLng: realLng + delta,
+      );
+
+      scanOsmViewport(
+        centerLat: realLat,
+        centerLng: realLng,
+        minLat: realLat - delta,
+        minLng: realLng - delta,
+        maxLat: realLat + delta,
+        maxLng: realLng + delta,
+      );
+    } else {
+      // If GPS is still resolving or fails, do not load a 500km country-wide box.
+      // Retain genuine cached stations if previously stored.
+      final cached = await StationLocalCache().getCachedStations();
+      final filtered = cached.where(state.activeFilter.matches).toList();
+      state = state.copyWith(
+        allStations: cached,
+        filteredStations: filtered,
+        isLoading: false,
+      );
+    }
   }
 
   /// Asynchronously retrieve charging stations from repository or cache.
@@ -109,22 +173,37 @@ class StationNotifier extends Notifier<StationState> {
         maxLng: maxLng,
       );
 
-      final filtered = result.stations.where(state.activeFilter.matches).toList();
+      final cLat = (minLat != null && maxLat != null) ? (minLat + maxLat) / 2.0 : state.referenceLat;
+      final cLng = (minLng != null && maxLng != null) ? (minLng + maxLng) / 2.0 : state.referenceLng;
+
+      // Keep newly discovered stations plus existing stations within relevant regional proximity (~60km)
+      final regionalStations = <ChargingStation>[...result.stations];
+      for (final s in state.allStations) {
+        if (!regionalStations.any((r) => r.id == s.id)) {
+          final dLat = (s.latitude - cLat).abs();
+          final dLon = (s.longitude - cLng).abs();
+          if (dLat <= 0.65 && dLon <= 0.65) {
+            regionalStations.add(s);
+          }
+        }
+      }
+
+      final filtered = regionalStations.where(state.activeFilter.matches).toList();
       state = state.copyWith(
-        allStations: result.stations,
+        allStations: regionalStations,
         filteredStations: filtered,
         isLoading: false,
         isOfflineMode: result.isOffline,
       );
 
-      if (result.stations.isEmpty && !result.isOffline) {
+      if (!result.isOffline) {
         scanOsmViewport(
-          centerLat: state.referenceLat,
-          centerLng: state.referenceLng,
-          minLat: minLat ?? (state.referenceLat - 0.15),
-          minLng: minLng ?? (state.referenceLng - 0.15),
-          maxLat: maxLat ?? (state.referenceLat + 0.15),
-          maxLng: maxLng ?? (state.referenceLng + 0.15),
+          centerLat: cLat,
+          centerLng: cLng,
+          minLat: minLat ?? (cLat - 0.15),
+          minLng: minLng ?? (cLng - 0.15),
+          maxLat: maxLat ?? (cLat + 0.15),
+          maxLng: maxLng ?? (cLng + 0.15),
         );
       }
     } catch (e) {
@@ -143,6 +222,16 @@ class StationNotifier extends Notifier<StationState> {
   /// Update reference coordinates for sorting nearby stations.
   void updateReferenceLocation(double lat, double lng) {
     state = state.copyWith(referenceLat: lat, referenceLng: lng);
+  }
+
+  /// Update user GPS coordinates and reference location.
+  void updateUserLocation(double lat, double lng) {
+    state = state.copyWith(
+      userLat: lat,
+      userLng: lng,
+      referenceLat: lat,
+      referenceLng: lng,
+    );
   }
 
   /// Apply keyword text search against station name, address, and city.
@@ -200,7 +289,7 @@ class StationNotifier extends Notifier<StationState> {
   }
 
   /// Select a station to focus map or open detail inspection bottom sheet.
-  void selectStation(ChargingStation? station) {
+  void selectStation(ChargingStation? station) async {
     state = state.copyWith(
       selectedStation: station,
       clearSelectedStation: station == null,
@@ -208,7 +297,23 @@ class StationNotifier extends Notifier<StationState> {
 
     // On-interaction upsert: if user inspects an external OSM or open data station, persist it to DB & cache
     if (station != null && (station.source == 'osm_live' || station.source == 'open_data_my')) {
-      ref.read(stationRepositoryProvider).upsertExternalStation(station);
+      final repository = ref.read(stationRepositoryProvider);
+      final savedStation = await repository.upsertExternalStation(station);
+      final updatedStations = state.allStations.map((s) {
+        return (s.id == station.id ||
+                (s.latitude == station.latitude && s.longitude == station.longitude))
+            ? savedStation
+            : s;
+      }).toList();
+
+      final filtered = updatedStations.where(state.activeFilter.matches).toList();
+      state = state.copyWith(
+        allStations: updatedStations,
+        filteredStations: filtered,
+        selectedStation:
+            state.selectedStation?.id == station.id ? savedStation : state.selectedStation,
+      );
+      await StationLocalCache().saveStations(updatedStations);
     }
   }
 
@@ -220,6 +325,7 @@ class StationNotifier extends Notifier<StationState> {
     required double minLng,
     required double maxLat,
     required double maxLng,
+    bool forceRefresh = false,
   }) async {
     try {
       final overpass = OsmOverpassService();
@@ -231,17 +337,39 @@ class StationNotifier extends Notifier<StationState> {
         maxLat: maxLat,
         maxLng: maxLng,
         existingStations: state.allStations,
+        forceRefresh: forceRefresh,
       );
 
       if (discovered.isNotEmpty) {
-        ref.read(stationRepositoryProvider).upsertBatch(discovered);
-        final merged = [...state.allStations, ...discovered];
-        final filtered = merged.where(state.activeFilter.matches).toList();
-        state = state.copyWith(
-          allStations: merged,
-          filteredStations: filtered,
-        );
-        return discovered.length;
+        // Keep newly discovered viewport stations in state with source: 'osm_live' without auto-upserting to DB
+        final toAdd = <ChargingStation>[];
+        for (final d in discovered) {
+          final isNear = state.allStations.any((s) {
+            final dLat = (s.latitude - d.latitude) * 111.0;
+            final dLon = (s.longitude - d.longitude) * 111.0 * cos(d.latitude * pi / 180.0);
+            return sqrt(dLat * dLat + dLon * dLon) < 0.15;
+          });
+          if (!isNear) {
+            toAdd.add(d);
+          }
+        }
+
+        if (toAdd.isNotEmpty) {
+          final merged = [...state.allStations, ...toAdd];
+          // Filter to stations relevant to the current map region (~60km / 0.65 deg) so list remains focused
+          final relevant = merged.where((s) {
+            final dLat = (s.latitude - centerLat).abs();
+            final dLon = (s.longitude - centerLng).abs();
+            return dLat <= 0.65 && dLon <= 0.65;
+          }).toList();
+
+          final filtered = relevant.where(state.activeFilter.matches).toList();
+          state = state.copyWith(
+            allStations: relevant,
+            filteredStations: filtered,
+          );
+          return toAdd.length;
+        }
       }
     } catch (_) {}
     return 0;
