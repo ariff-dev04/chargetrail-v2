@@ -7,6 +7,7 @@ import '../../../vehicles/presentation/vehicle_controller.dart';
 import '../../domain/route_models.dart';
 import '../navigation_launcher.dart';
 import 'charging_stop_tile.dart';
+import 'route_advisory_banner.dart';
 class RouteTelemetryCard extends ConsumerStatefulWidget {
   final RoutePlanResult plan;
   final PlaceSuggestion? origin;
@@ -428,7 +429,7 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
               ],
             ),
           ),
-          _buildDriverDisclaimer(isDark),
+          const RouteAdvisoryBanner(),
         ],
       );
     }
@@ -454,33 +455,8 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
             stop: entry.value,
           );
         }),
-        _buildDriverDisclaimer(isDark),
+        const RouteAdvisoryBanner(),
       ],
-    );
-  }
-
-  Widget _buildDriverDisclaimer(bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_outline_rounded, size: 14, color: AppTheme.primaryTeal),
-          SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              'Disclaimer: Route & charger locations are sourced from open community data (OpenStreetMap). Always verify highway direction (Northbound/Southbound R&R), charger availability, and parking access rules before navigating.',
-              style: TextStyle(fontSize: 10, color: Colors.grey, height: 1.3),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

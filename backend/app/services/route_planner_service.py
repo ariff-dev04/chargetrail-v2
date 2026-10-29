@@ -1,7 +1,6 @@
 """Route planning engine calculating range anxiety risk and corridor charging stops."""
 
 import asyncio
-from dataclasses import dataclass
 
 from app.repositories.station_repository import StationRepository
 from app.repositories.vehicle_repository import VehicleRepository
@@ -12,66 +11,19 @@ from app.schemas.routing import (
     RoutePlanResponse,
 )
 from app.schemas.station import StationCreate, StationFilterParams, StationRead
+from app.services.directional_highway_scorer import (
+    CorridorCandidate,
+    build_corridor_candidates,
+    is_directionally_compatible,
+)
 from app.services.osm_harvester_service import OsmHarvesterService
 from app.services.osrm_client import OsrmClient
 from app.services.station_service import StationService, haversine_distance_km
 
-NORTHBOUND_KEYWORDS = ("northbound", "north bound", " nb", "arah utara", "utara")
-SOUTHBOUND_KEYWORDS = ("southbound", "south bound", " sb", "arah selatan", "selatan")
-EASTBOUND_KEYWORDS = ("eastbound", "east bound", " eb", "arah timur", "timur")
-WESTBOUND_KEYWORDS = ("westbound", "west bound", " wb", "arah barat", "barat")
+_CorridorCandidate = CorridorCandidate
+_is_directionally_compatible = is_directionally_compatible
 
-
-def _has_keyword(text: str, keywords: tuple[str, ...]) -> bool:
-    return any(kw in text for kw in keywords)
-
-
-@dataclass
-class _CorridorCandidate:
-    station: StationRead
-    dist: float
-    detour: float
-    local_dlat: float = 0.0
-    local_dlng: float = 0.0
-    is_on_left: bool = False
-
-
-def _is_directionally_compatible(
-    station_name: str,
-    station_address: str,
-    station_lat: float,
-    station_lng: float = 0.0,
-    origin_lat: float = 0.0,
-    dest_lat: float = 0.0,
-    local_dlat: float | None = None,
-    local_dlng: float | None = None,
-) -> bool:
-    del station_lng
-    raw = f"{station_name.lower()} {station_address.lower()}"
-    text = (
-        raw.replace("utara-selatan", "")
-        .replace("utara\u2013selatan", "")
-        .replace("utara selatan", "")
-        .replace("north-south", "")
-    )
-    has_nb, has_sb = (
-        _has_keyword(text, NORTHBOUND_KEYWORDS),
-        _has_keyword(text, SOUTHBOUND_KEYWORDS),
-    )
-    has_eb, has_wb = _has_keyword(text, EASTBOUND_KEYWORDS), _has_keyword(text, WESTBOUND_KEYWORDS)
-
-    d_lat = (
-        local_dlat
-        if local_dlat is not None and abs(local_dlat) > 0.0001
-        else (dest_lat - origin_lat)
-    )
-    d_lng = local_dlng if local_dlng is not None and abs(local_dlng) > 0.0001 else 0.0
-
-    if (d_lat > 0.0005 and has_sb and not has_nb) or (d_lat < -0.0005 and has_nb and not has_sb):
-        return False
-    if (d_lng > 0.0005 and has_wb and not has_eb) or (d_lng < -0.0005 and has_eb and not has_wb):
-        return False
-    return (min(origin_lat, dest_lat) - 0.05) <= station_lat <= (max(origin_lat, dest_lat) + 0.05)
+__all__ = ["RoutePlannerService", "_CorridorCandidate", "_is_directionally_compatible"]
 
 
 class RoutePlannerService:
@@ -91,14 +43,8 @@ class RoutePlannerService:
 
     async def plan_route(self, request: RoutePlanRequest) -> RoutePlanResponse:
         """Execute battery-aware journey simulation and recommend optimized charging stops."""
-        (
-            battery_kwh,
-            efficiency,
-            max_dc_kw,
-            connector,
-            reserve_soc,
-            vehicle_label,
-        ) = await self._resolve_vehicle_specs(request)
+        specs = await self._resolve_vehicle_specs(request)
+        battery_kwh, efficiency, max_dc_kw, connector, reserve_soc, vehicle_label = specs
         points, total_dist_km, drive_mins = await self.osrm_client.fetch_route(
             origin_lat=request.origin_lat,
             origin_lng=request.origin_lng,
@@ -127,25 +73,24 @@ class RoutePlannerService:
             status_code,
         )
 
-        resp_dict = {
-            "origin_name": request.origin_name,
-            "destination_name": request.destination_name,
-            "total_distance_km": total_dist_km,
-            "estimated_drive_minutes": drive_mins,
-            "total_charging_minutes": total_charge_mins,
-            "total_trip_minutes": drive_mins + total_charge_mins,
-            "starting_soc_percent": request.starting_soc_percent,
-            "final_arrival_soc_percent": final_arrival_soc,
-            "projected_destination_soc_without_charging": projected_dest_soc,
-            "total_energy_kwh": total_energy_kwh,
-            "range_anxiety_status": status_code,
-            "status_summary": status_summary,
-            "vehicle_summary": vehicle_label,
-            "polyline_points": points,
-            "recommended_stops": recommended_stops,
-            "corridor_stations": corridor_stations,
-        }
-        return RoutePlanResponse(**resp_dict)
+        return RoutePlanResponse(
+            origin_name=request.origin_name,
+            destination_name=request.destination_name,
+            total_distance_km=total_dist_km,
+            estimated_drive_minutes=drive_mins,
+            total_charging_minutes=total_charge_mins,
+            total_trip_minutes=drive_mins + total_charge_mins,
+            starting_soc_percent=request.starting_soc_percent,
+            final_arrival_soc_percent=final_arrival_soc,
+            projected_destination_soc_without_charging=projected_dest_soc,
+            total_energy_kwh=total_energy_kwh,
+            range_anxiety_status=status_code,
+            status_summary=status_summary,
+            vehicle_summary=vehicle_label,
+            polyline_points=points,
+            recommended_stops=recommended_stops,
+            corridor_stations=corridor_stations,
+        )
 
     async def _resolve_vehicle_specs(
         self, req: RoutePlanRequest
@@ -222,7 +167,7 @@ class RoutePlannerService:
                 if isinstance(r, list):
                     osm_candidates.extend(r)
         else:
-            osm_candidates = await OsmHarvesterService.harvest_viewport(
+            osm_res = await OsmHarvesterService.harvest_viewport(
                 min_lat=min_lat,
                 min_lng=min_lng,
                 max_lat=max_lat,
@@ -231,80 +176,33 @@ class RoutePlannerService:
                 center_lng=c_lng,
                 persist=False,
             )
+            if isinstance(osm_res, list):
+                osm_candidates = osm_res
 
         all_stations = StationService.merge_osm_stations(
             db_stations=db_stations,
             osm_candidates=osm_candidates,
             filters=corridor_filters,
         )
-        candidates: list[_CorridorCandidate] = []
-        max_corridor_detour = min(req.corridor_radius_km, 5.0)
 
-        for st in all_stations:
-            detour_km = min(
-                haversine_distance_km(p.latitude, p.longitude, st.latitude, st.longitude)
-                for p in points
-            )
-            if detour_km <= max_corridor_detour:
-                closest_idx = min(
-                    range(len(points)),
-                    key=lambda i: haversine_distance_km(
-                        points[i].latitude, points[i].longitude, st.latitude, st.longitude
-                    ),
-                )
-                start_idx, end_idx = max(0, closest_idx - 3), min(len(points) - 1, closest_idx + 3)
-                local_dlat = points[end_idx].latitude - points[start_idx].latitude
-                local_dlng = points[end_idx].longitude - points[start_idx].longitude
+        seen_coords: set[tuple[float, float]] = set()
+        deduped: list[StationRead] = []
+        for st in sorted(
+            all_stations, key=lambda s: (round(s.latitude, 5), round(s.longitude, 5), str(s.id))
+        ):
+            coord_key = (round(st.latitude, 5), round(st.longitude, 5))
+            if coord_key not in seen_coords:
+                seen_coords.add(coord_key)
+                deduped.append(st)
 
-                trip_dlat, trip_dlng = d_lat - o_lat, d_lng - o_lng
-                if (trip_dlat > 0.1 and local_dlat <= 0) or (trip_dlat < -0.1 and local_dlat >= 0):
-                    local_dlat = trip_dlat
-                if (trip_dlng > 0.1 and local_dlng <= 0) or (trip_dlng < -0.1 and local_dlng >= 0):
-                    local_dlng = trip_dlng
-
-                if not _is_directionally_compatible(
-                    station_name=st.name,
-                    station_address=st.address,
-                    station_lat=st.latitude,
-                    station_lng=st.longitude,
-                    origin_lat=o_lat,
-                    dest_lat=d_lat,
-                    local_dlat=local_dlat,
-                    local_dlng=local_dlng,
-                ):
-                    continue
-
-                pt = points[closest_idx]
-                is_on_left = (
-                    local_dlng * (st.latitude - pt.latitude)
-                    - local_dlat * (st.longitude - pt.longitude)
-                ) > 0
-                dist_along = (
-                    sum(
-                        haversine_distance_km(
-                            points[i].latitude,
-                            points[i].longitude,
-                            points[i + 1].latitude,
-                            points[i + 1].longitude,
-                        )
-                        for i in range(closest_idx)
-                    )
-                    + detour_km
-                )
-
-                candidates.append(
-                    _CorridorCandidate(
-                        station=st,
-                        dist=round(dist_along, 1),
-                        detour=round(detour_km, 1),
-                        local_dlat=local_dlat,
-                        local_dlng=local_dlng,
-                        is_on_left=is_on_left,
-                    )
-                )
-
-        candidates.sort(key=lambda c: c.dist)
-        return candidates
+        return build_corridor_candidates(
+            stations=deduped,
+            points=points,
+            origin_lat=o_lat,
+            dest_lat=d_lat,
+            max_corridor_detour=min(req.corridor_radius_km, 5.0),
+            prefer_easy_access=getattr(req, "prefer_easy_access", False),
+        )
 
     def _classify_range_anxiety(
         self, proj_soc: int, res_soc: int, start_soc: int, used_pct: int
@@ -326,44 +224,7 @@ class RoutePlannerService:
 
     @staticmethod
     def _score_candidate(c: _CorridorCandidate) -> float:
-        st = c.station
-        score = st.max_power_kw + (50.0 if c.detour < 1.5 else -c.detour * 10.0)
-        desc = f"{st.name.lower()} {str(st.address).lower()} {str(st.parking_level).lower()} {st.city.lower()}"
-        nb, sb = _has_keyword(desc, NORTHBOUND_KEYWORDS), _has_keyword(desc, SOUTHBOUND_KEYWORDS)
-
-        if (c.local_dlat > 0.0005 and nb and not sb) or (c.local_dlat < -0.0005 and sb and not nb):
-            score += 120.0
-        if c.is_on_left:
-            score += 40.0
-        if any(
-            k in desc
-            for k in [
-                "r&r",
-                "rsa",
-                "layby",
-                "highway",
-                "petrol",
-                "shell",
-                "petronas",
-                "caltex",
-                "open",
-            ]
-        ):
-            score += 80.0
-        if any(
-            k in desc
-            for k in [
-                "mall",
-                "plaza",
-                "klcc",
-                "pavilion",
-                "basement",
-                "multi-storey",
-                "underground",
-            ]
-        ) or (st.parking_fee_myr and st.parking_fee_myr > 0.0):
-            score -= 60.0
-        return score
+        return c.score
 
     @staticmethod
     def _build_stop(
@@ -414,25 +275,25 @@ class RoutePlannerService:
             if current_soc - soc_to_dest >= reserve_soc:
                 return stops, total_charge_mins, max(round(current_soc - soc_to_dest), 0)
 
-            max_safe_dist = current_km + (
+            max_safe = current_km + (
                 (current_soc - reserve_soc) / 100.0 * battery_kwh * 1000.0 / efficiency
             )
-            min_stop_dist = (
+            min_stop = (
                 current_km + 25.0
                 if current_km == 0 and current_soc > reserve_soc + 10
                 else current_km
             )
 
-            reachable = [c for c in candidates if min_stop_dist < c.dist <= max_safe_dist]
+            reachable = [c for c in candidates if min_stop < c.dist <= max_safe]
             if not reachable:
-                reachable = [c for c in candidates if current_km < c.dist <= max_safe_dist]
+                reachable = [c for c in candidates if current_km < c.dist <= max_safe]
             if not reachable:
                 reachable = [c for c in candidates if c.dist > current_km]
             if not reachable:
                 break
 
-            preferred = next((c for c in reachable if str(c.station.id) in preferred_set), None)
-            if not preferred and preferred_set:
+            pref = next((c for c in reachable if str(c.station.id) in preferred_set), None)
+            if not pref and preferred_set:
                 ext_dist = current_km + (
                     (current_soc - max(reserve_soc - 5, 5))
                     / 100.0
@@ -440,7 +301,7 @@ class RoutePlannerService:
                     * 1000.0
                     / efficiency
                 )
-                preferred = next(
+                pref = next(
                     (
                         c
                         for c in candidates
@@ -448,7 +309,16 @@ class RoutePlannerService:
                     ),
                     None,
                 )
-            best = preferred or max(reachable, key=lambda c: (self._score_candidate(c), c.dist))
+
+            def key_fn(c):
+                return (
+                    c.score,
+                    round(c.station.latitude, 6),
+                    round(c.station.longitude, 6),
+                    str(c.station.id),
+                )
+
+            best = pref or min(reachable, key=key_fn)
 
             leg_energy = ((best.dist - current_km) * efficiency) / 1000.0
             arrival_soc = round(current_soc - (leg_energy / battery_kwh) * 100.0)
@@ -461,8 +331,15 @@ class RoutePlannerService:
 
             nearby_alts = [
                 c.station
-                for c in candidates
-                if abs(c.dist - best.dist) <= 45.0 and str(c.station.id) != str(best.station.id)
+                for c in sorted(
+                    [
+                        c
+                        for c in candidates
+                        if abs(c.dist - best.dist) <= 45.0
+                        and str(c.station.id) != str(best.station.id)
+                    ],
+                    key=key_fn,
+                )
             ][:4]
             closest_p = min(
                 points,
@@ -483,7 +360,6 @@ class RoutePlannerService:
                     nearby_alts,
                 )
             )
-
             total_charge_mins += charge_mins
             current_km, current_soc = best.dist, target_dep_soc
 
