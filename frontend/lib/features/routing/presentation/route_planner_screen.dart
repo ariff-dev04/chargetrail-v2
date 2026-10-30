@@ -13,7 +13,7 @@ import 'widgets/route_telemetry_card.dart';
 /// Which floating panel is actively expanded on the route planner screen.
 enum ActiveRoutePanel { none, search, telemetry }
 
-/// Main interactive EV Route Planner screen with OSRM polylines, map styles, and charging stops.
+/// Main interactive EV Route Planner screen with ABRP-inspired bottom panels and floating callout pill markers.
 class RoutePlannerScreen extends ConsumerStatefulWidget {
   const RoutePlannerScreen({super.key});
 
@@ -38,7 +38,7 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
         _mapController.fitCamera(
           CameraFit.bounds(
             bounds: bounds,
-            padding: const EdgeInsets.only(left: 36, right: 36, top: 120, bottom: 100),
+            padding: const EdgeInsets.only(left: 36, right: 36, top: 120, bottom: 120),
           ),
         );
       } catch (_) {}
@@ -58,7 +58,7 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // 1. OpenStreetMap Polyline & Waypoint Markers Layer (KF13)
+          // 1. OpenStreetMap Polyline & Floating Callout Waypoint Markers
           Listener(
             behavior: HitTestBehavior.translucent,
             onPointerDown: (_) {
@@ -85,17 +85,16 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
                   userAgentPackageName: 'com.chargetrail.v2',
                 ),
                 if (plan != null && plan.polylinePoints.isNotEmpty) ...[
-                  // Two-Tone Road Polyline (Dark Teal Border + Bright Cyan Core)
                   PolylineLayer(
                     polylines: [
                       Polyline(
                         points: plan.polylinePoints,
-                        color: const Color(0xFF0F3E3B), // Dark Teal Outer Border
+                        color: const Color(0xFF0F3E3B),
                         strokeWidth: 7.0,
                       ),
                       Polyline(
                         points: plan.polylinePoints,
-                        color: const Color(0xFF00E5FF), // Bright Cyan Inner Road Core
+                        color: const Color(0xFF00E5FF),
                         strokeWidth: 4.5,
                       ),
                     ],
@@ -110,15 +109,44 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
                           height: 32,
                           child: const Icon(Icons.trip_origin, color: AppTheme.successGreen, size: 24),
                         ),
-                      // Destination Pin (Red)
+
+                      // Destination Callout Pill Marker (Icons.flag_rounded + Arrival SoC)
                       if (state.selectedDestination != null && state.selectedDestination!.name.isNotEmpty)
                         Marker(
                           point: state.selectedDestination!.latLng,
-                          width: 32,
-                          height: 32,
-                          child: const Icon(Icons.flag, color: Colors.red, size: 28),
+                          width: 80,
+                          height: 42,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryTeal,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white, width: 1.5),
+                                  boxShadow: [
+                                    BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 4, offset: const Offset(0, 2)),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.flag_rounded, color: Colors.white, size: 12),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '${plan.finalArrivalSocPercent}%',
+                                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.arrow_drop_down, color: AppTheme.primaryTeal, size: 14),
+                            ],
+                          ),
                         ),
-                      // Corridor Vicinity Chargers (Compact Teal EV Pins)
+
+                      // Corridor Vicinity Chargers
                       ...plan.corridorStations
                           .where((cs) => !plan.recommendedStops.any((rs) => rs.station.id == cs.id))
                           .map((station) {
@@ -139,20 +167,42 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
                           ),
                         );
                       }),
-                      // Recommended Charging Stop Markers (Orange Lightning Bolt)
+
+                      // Recommended Charging Stops: Floating Duration Callout Pill Markers (96 x 42)
                       ...plan.recommendedStops.map((stop) {
                         return Marker(
                           point: LatLng(stop.station.latitude, stop.station.longitude),
-                          width: 36,
-                          height: 36,
+                          width: 96,
+                          height: 42,
                           child: GestureDetector(
                             onTap: () => StationDetailSheet.show(context, stop.station),
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                color: AppTheme.ultraFastColor,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.bolt, color: Colors.white, size: 22),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF991B1B), // dark crimson callout pill
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.white, width: 1.5),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 5, offset: const Offset(0, 2)),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.flash_on_rounded, color: Colors.amber, size: 13),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        '${stop.estimatedChargeMinutes} min',
+                                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_drop_down, color: Color(0xFF991B1B), size: 14),
+                              ],
                             ),
                           ),
                         );
@@ -164,7 +214,7 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
             ),
           ),
 
-          // 2. Top Interactive Route Control Panel (Free-Text Search & SoC)
+          // 2. Top Compact Route Search Pill (when plan active) or Search Bar
           Positioned(
             top: 0,
             left: 0,
@@ -173,7 +223,7 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 child: RouteSearchCard(
-                  isExpanded: _activePanel == ActiveRoutePanel.search,
+                  isExpanded: plan == null ? true : (_activePanel == ActiveRoutePanel.search),
                   onToggleExpand: () {
                     setState(() {
                       _activePanel = _activePanel == ActiveRoutePanel.search
@@ -191,7 +241,7 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
             ),
           ),
 
-          // 3. Bottom Expandable Battery Telemetry & Stop Timeline Sheet (KF14, KF15)
+          // 3. Bottom Docked Battery Telemetry Sheet (leaves 70-80% map unobstructed)
           if (plan != null)
             Positioned(
               bottom: 0,
@@ -200,7 +250,7 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
               child: SafeArea(
                 top: false,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   child: RouteTelemetryCard(
                     plan: plan,
                     origin: state.origin,
