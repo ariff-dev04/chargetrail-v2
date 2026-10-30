@@ -16,3 +16,7 @@ frontend/android/.gradle/
 frontend/android/app/build/
 frontend/android/local.properties
 frontend/windows/flutter/ephemeral/
+
+# Local AI CLI config (excluded from public repo)
+GEMINI.md
+.gemini/
