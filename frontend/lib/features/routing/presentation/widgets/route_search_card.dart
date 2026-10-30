@@ -2,14 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../../../core/config/map_tile_config.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../vehicles/presentation/vehicle_controller.dart';
 import '../../data/route_repository.dart';
 import '../../domain/route_models.dart';
 import '../route_controller.dart';
 
-/// ABRP-inspired bottom-sheet route search panel with expandable vehicle telemetry & stop strategies.
+/// ABRP-inspired route search section inside the unified bottom sheet.
 class RouteSearchCard extends ConsumerStatefulWidget {
   final bool? isExpanded;
   final VoidCallback? onToggleExpand, onPlanRouteCompleted;
@@ -95,7 +94,11 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
   Future<void> _planRoute() async {
     FocusScope.of(context).unfocus();
     setState(() { _suggestions = []; _activeField = null; });
-    await ref.read(routeControllerProvider.notifier).calculateRoute();
+    final notifier = ref.read(routeControllerProvider.notifier);
+    await notifier.calculateRoute();
+    if (ref.read(routeControllerProvider).isMoreOptionsExpanded) {
+      notifier.toggleMoreOptions();
+    }
     if (widget.onPlanRouteCompleted != null) {
       widget.onPlanRouteCompleted!();
     } else if (mounted) {
@@ -120,18 +123,19 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
         key: const Key('collapsed_search_pill'),
         onTap: _toggle,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.cardDark : Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 8, offset: const Offset(0, 2))],
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Colors.transparent,
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.route, color: AppTheme.primaryTeal, size: 18),
               const SizedBox(width: 8),
-              Flexible(child: Text('${_shorten(state.origin.name)} ➔ ${_shorten(state.destination.name)} • ${state.startingSocPercent}% SoC', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+              Expanded(
+                child: Text(
+                  '${_shorten(state.origin.name)} ➔ ${_shorten(state.destination.name)} • ${state.startingSocPercent}% SoC',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -148,38 +152,27 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
     }
 
     return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.cardDark : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 12, offset: const Offset(0, -3))],
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      color: Colors.transparent,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Center(
-            child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(2))),
-          ),
-          const SizedBox(height: 8),
           if (state.isLoading) ...[
             const ClipRRect(borderRadius: BorderRadius.all(Radius.circular(2)), child: LinearProgressIndicator(minHeight: 3, backgroundColor: Colors.transparent, color: AppTheme.primaryTeal)),
             const SizedBox(height: 6),
           ],
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Route & Battery Simulation', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              Row(children: [
-                const MapStyleSelectorButton(),
-                const SizedBox(width: 4),
-                TextButton.icon(
-                  key: const Key('search_card_collapse_button'),
-                  onPressed: _toggle,
-                  icon: const Icon(Icons.keyboard_arrow_down, size: 16),
-                  label: const Text('Collapse', style: TextStyle(fontSize: 11)),
-                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-                ),
-              ]),
+              const Expanded(
+                child: Text('Route & Battery Simulation', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+              TextButton.icon(
+                key: const Key('search_card_collapse_button'),
+                onPressed: _toggle,
+                icon: const Icon(Icons.keyboard_arrow_down, size: 16),
+                label: const Text('Collapse', style: TextStyle(fontSize: 11)),
+                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -225,22 +218,26 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              TextButton.icon(
-                onPressed: () {
-                  final tmp = _originCtrl.text;
-                  _originCtrl.text = _destCtrl.text;
-                  _destCtrl.text = tmp;
-                  notifier.swapOriginDestination();
-                },
-                icon: const Icon(Icons.swap_vert_rounded, size: 16, color: AppTheme.primaryTeal),
-                label: const Text('Swap / Reverse', style: TextStyle(fontSize: 11, color: AppTheme.primaryTeal)),
-                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              Flexible(
+                child: TextButton.icon(
+                  onPressed: () {
+                    final tmp = _originCtrl.text;
+                    _originCtrl.text = _destCtrl.text;
+                    _destCtrl.text = tmp;
+                    notifier.swapOriginDestination();
+                  },
+                  icon: const Icon(Icons.swap_vert_rounded, size: 16, color: AppTheme.primaryTeal),
+                  label: const Text('Swap / Reverse', style: TextStyle(fontSize: 11, color: AppTheme.primaryTeal), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                ),
               ),
-              TextButton.icon(
-                onPressed: notifier.toggleMoreOptions,
-                icon: Icon(state.isMoreOptionsExpanded ? Icons.keyboard_arrow_up : Icons.more_horiz_rounded, size: 16),
-                label: Text(state.isMoreOptionsExpanded ? 'less' : 'more options', style: const TextStyle(fontSize: 11)),
-                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              Flexible(
+                child: TextButton.icon(
+                  onPressed: notifier.toggleMoreOptions,
+                  icon: Icon(state.isMoreOptionsExpanded ? Icons.keyboard_arrow_up : Icons.more_horiz_rounded, size: 16),
+                  label: Text(state.isMoreOptionsExpanded ? 'less' : 'more options', style: const TextStyle(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                ),
               ),
             ],
           ),
@@ -266,6 +263,7 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
                               const Icon(Icons.directions_car_rounded, size: 16, color: AppTheme.primaryTeal),
                               const SizedBox(width: 6),
                               Expanded(child: Text('${vehicle.brand} ${vehicle.modelName}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                              const SizedBox(width: 6),
                               Icon(Icons.battery_charging_full_rounded, size: 16, color: _getSocColor(state.startingSocPercent)),
                               const SizedBox(width: 4),
                               Text('${state.startingSocPercent}%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _getSocColor(state.startingSocPercent))),
@@ -293,7 +291,7 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
                       ),
                       const SizedBox(height: 10),
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        const Text('Destination arrival SoC', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        const Expanded(child: Text('Destination arrival SoC', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis)),
                         Text('${state.targetArrivalSocPct.toInt()}%', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal)),
                       ]),
                       Slider(value: state.targetArrivalSocPct, min: 5, max: 50, divisions: 9, activeColor: AppTheme.primaryTeal, onChanged: (v) => notifier.setTargetArrivalSoc(v)),
