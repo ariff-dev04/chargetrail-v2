@@ -41,9 +41,9 @@ class RoutePlanRequest {
   final String? vehicleId;
   final int startingSocPercent, reserveSocPercent;
   final double batteryCapacityKwh, efficiencyWhPerKm, maxDcChargeKw, corridorRadiusKm, targetArrivalSocPct;
-  final String connectorType, stopStrategy;
+  final String connectorType, stopStrategy, vehicleName;
   final List<String> preferredStopStationIds;
-  final bool preferEasyAccess;
+  final bool preferEasyAccess, isTeslaVehicle;
 
   const RoutePlanRequest({
     required this.origin, required this.destination, this.vehicleId,
@@ -52,6 +52,7 @@ class RoutePlanRequest {
     required this.connectorType, required this.reserveSocPercent,
     this.corridorRadiusKm = 25.0, this.preferredStopStationIds = const [],
     this.stopStrategy = 'quickest', this.targetArrivalSocPct = 20.0, this.preferEasyAccess = true,
+    this.vehicleName = '', this.isTeslaVehicle = false,
   });
 
   RoutePlanRequest copyWith({
@@ -60,6 +61,7 @@ class RoutePlanRequest {
     double? maxDcChargeKw, String? connectorType, int? reserveSocPercent,
     double? corridorRadiusKm, List<String>? preferredStopStationIds,
     String? stopStrategy, double? targetArrivalSocPct, bool? preferEasyAccess,
+    String? vehicleName, bool? isTeslaVehicle,
   }) => RoutePlanRequest(
         origin: origin ?? this.origin, destination: destination ?? this.destination,
         vehicleId: vehicleId ?? this.vehicleId,
@@ -74,6 +76,8 @@ class RoutePlanRequest {
         stopStrategy: stopStrategy ?? this.stopStrategy,
         targetArrivalSocPct: targetArrivalSocPct ?? this.targetArrivalSocPct,
         preferEasyAccess: preferEasyAccess ?? this.preferEasyAccess,
+        vehicleName: vehicleName ?? this.vehicleName,
+        isTeslaVehicle: isTeslaVehicle ?? this.isTeslaVehicle,
       );
 
   Map<String, dynamic> toJson() => {
@@ -86,6 +90,7 @@ class RoutePlanRequest {
         'preferred_stop_station_ids': preferredStopStationIds,
         'stop_strategy': stopStrategy, 'target_arrival_soc_pct': targetArrivalSocPct,
         'prefer_easy_access': preferEasyAccess,
+        'vehicle_name': vehicleName, 'is_tesla_vehicle': isTeslaVehicle,
       };
 }
 
