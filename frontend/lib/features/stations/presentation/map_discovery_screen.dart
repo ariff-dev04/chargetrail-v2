@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../../community/presentation/submit_station_sheet.dart';
 import 'station_controller.dart';
 import 'widgets/nearby_stations_carousel.dart';
+import 'widgets/operator_marker_badge.dart';
 import 'widgets/station_detail_sheet.dart';
 import 'widgets/station_filter_bar.dart';
 
@@ -46,7 +47,6 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
     ref.read(stationControllerProvider.notifier).updateUserLocation(loc.latitude, loc.longitude);
     _centerMap(loc.latLng, 14.0);
 
-    // Auto-discover nearby open EV chargers around physical GPS
     ref.read(stationControllerProvider.notifier).scanOsmViewport(
           centerLat: loc.latitude,
           centerLng: loc.longitude,
@@ -158,18 +158,18 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
                     Marker(point: userLoc.latLng, width: 34, height: 34, child: const UserLocationMarkerWidget()),
                   ...state.filteredStations.map((station) {
                     final isSelected = state.selectedStation?.id == station.id;
-                    final isOpenData = station.source == 'osm_live' || station.source == 'open_data_my';
 
                     return Marker(
                       point: LatLng(station.latitude, station.longitude),
-                      width: isSelected ? 48 : 40,
-                      height: isSelected ? 48 : 40,
-                      child: GestureDetector(
+                      width: 56,
+                      height: 56,
+                      child: OperatorMapMarker(
+                        station: station,
+                        isSelected: isSelected,
                         onTap: () {
                           notifier.selectStation(station);
                           StationDetailSheet.show(context, station);
                         },
-                        child: _markerIcon(station.maxPowerKw >= 120.0, isSelected, isOpenData),
                       ),
                     );
                   }),
@@ -178,7 +178,7 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
             ],
           ),
 
-          // Top Floating Filter Bar Overlay, Style Switcher & OSM Viewport Scanner
+          // Top Floating Filter Bar Overlay, Style Switcher, OSM Scanner & Live Sync Banner
           Positioned(
             top: 0,
             left: 0,
@@ -254,13 +254,37 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
                         const MapStyleSelectorButton(),
                       ],
                     ),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: state.isLoading
+                          ? Container(
+                              key: const ValueKey('syncing_banner'),
+                              margin: const EdgeInsets.only(top: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: isDark ? AppTheme.cardDark : Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 6, offset: const Offset(0, 2))],
+                                border: Border.all(color: AppTheme.primaryTeal.withValues(alpha: 0.4)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryTeal)),
+                                  SizedBox(width: 8),
+                                  Text('Syncing live chargers...', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal)),
+                                ],
+                              ),
+                            )
+                          : const SizedBox.shrink(key: ValueKey('empty_sync')),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
 
-          // Floating Bottom Controls: Nearby Chargers Carousel, Counter, Add & GPS
+          // Floating Bottom Controls: Animated Nearby Chargers Carousel, Counter, Add & GPS
           Positioned(
             bottom: 20,
             left: 0,
@@ -268,15 +292,24 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Nearby Chargers Horizontal Carousel
-                NearbyStationsCarousel(
-                  stations: state.nearbyStations,
-                  distanceCalculator: (lat, lng) => state.distanceKmTo(lat, lng),
-                  onStationTap: (station) {
-                    notifier.selectStation(station);
-                    _centerMap(LatLng(station.latitude, station.longitude), 15.0);
-                    StationDetailSheet.show(context, station);
-                  },
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    child: state.nearbyStations.isNotEmpty
+                        ? NearbyStationsCarousel(
+                            key: const ValueKey('carousel_active'),
+                            stations: state.nearbyStations,
+                            distanceCalculator: (lat, lng) => state.distanceKmTo(lat, lng),
+                            onStationTap: (station) {
+                              notifier.selectStation(station);
+                              _centerMap(LatLng(station.latitude, station.longitude), 15.0);
+                              StationDetailSheet.show(context, station);
+                            },
+                          )
+                        : const SizedBox.shrink(key: ValueKey('carousel_empty')),
+                  ),
                 ),
                 const SizedBox(height: 8),
 
@@ -330,21 +363,6 @@ class _MapDiscoveryScreenState extends ConsumerState<MapDiscoveryScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _markerIcon(bool isUltraFast, bool isSelected, bool isOpenData) {
-    final color = isOpenData ? const Color(0xFF0284C7) : (isUltraFast ? AppTheme.ultraFastColor : AppTheme.primaryTeal);
-    return Container(
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: isSelected ? Colors.amber : Colors.white, width: isSelected ? 3.0 : 1.8),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 5)],
-      ),
-      child: Center(
-        child: Icon(isUltraFast ? Icons.bolt : (isOpenData ? Icons.public : Icons.ev_station), color: Colors.white, size: isSelected ? 24 : 20),
       ),
     );
   }

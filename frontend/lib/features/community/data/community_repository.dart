@@ -5,27 +5,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../stations/domain/station_model.dart';
 import '../domain/community_models.dart';
 
-/// Repository coordinating community station submissions, reviews, and consensus telemetry.
+/// Repository coordinating community station submissions, reviews, consensus telemetry, and edit proposals.
 class CommunityRepository {
   static const String _pendingStationsKey = 'chargetrail_pending_stations_v1';
   static const String _reviewsPrefix = 'chargetrail_reviews_v1_';
   static const String _surveysPrefix = 'chargetrail_surveys_v1_';
+  static const String _editsPrefix = 'chargetrail_edits_v1_';
 
   final Dio _dio;
   final SharedPreferences? prefs;
 
-  CommunityRepository({
-    Dio? dio,
-    this.prefs,
-    String? baseUrl,
-  }) : _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: baseUrl ?? ApiConfig.baseUrl,
-                connectTimeout: const Duration(seconds: 3),
-                receiveTimeout: const Duration(seconds: 3),
-              ),
-            );
+  CommunityRepository({Dio? dio, this.prefs, String? baseUrl})
+      : _dio = dio ?? Dio(BaseOptions(baseUrl: baseUrl ?? ApiConfig.baseUrl, connectTimeout: const Duration(seconds: 3), receiveTimeout: const Duration(seconds: 3)));
 
   /// Submit a newly discovered or hidden community EV charger.
   Future<ChargingStation> submitStation(ChargingStation station) async {
@@ -50,20 +41,10 @@ class CommunityRepository {
 
     final pendingStation = ChargingStation(
       id: 'community-${DateTime.now().millisecondsSinceEpoch}',
-      name: station.name,
-      operatorName: station.operatorName,
-      address: station.address,
-      city: station.city,
-      state: station.state,
-      latitude: station.latitude,
-      longitude: station.longitude,
-      plugTypes: station.plugTypes,
-      maxPowerKw: station.maxPowerKw,
-      isAvailable: station.isAvailable,
-      parkingLevel: station.parkingLevel,
-      howToAccess: station.howToAccess,
-      source: 'community',
-      isVerified: false,
+      name: station.name, operatorName: station.operatorName, address: station.address,
+      city: station.city, state: station.state, latitude: station.latitude, longitude: station.longitude,
+      plugTypes: station.plugTypes, maxPowerKw: station.maxPowerKw, isAvailable: station.isAvailable,
+      parkingLevel: station.parkingLevel, howToAccess: station.howToAccess, source: 'community', isVerified: false,
     );
     list.add(pendingStation);
     await p.setString(_pendingStationsKey, jsonEncode(list.map((s) => s.toJson()).toList()));
@@ -81,7 +62,6 @@ class CommunityRepository {
       }
     } catch (_) {}
 
-    // Offline fallback
     final p = prefs ?? await SharedPreferences.getInstance();
     final raw = p.getString(_pendingStationsKey);
     if (raw != null && raw.isNotEmpty) {
@@ -104,7 +84,6 @@ class CommunityRepository {
       }
     } catch (_) {}
 
-    // Offline fallback
     final p = prefs ?? await SharedPreferences.getInstance();
     final raw = p.getString(_pendingStationsKey);
     if (raw != null) {
@@ -117,20 +96,10 @@ class CommunityRepository {
         await p.setString(_pendingStationsKey, jsonEncode(list.map((s) => s.toJson()).toList()));
         if (approve) {
           return ChargingStation(
-            id: target.id,
-            name: target.name,
-            operatorName: target.operatorName,
-            address: target.address,
-            city: target.city,
-            state: target.state,
-            latitude: target.latitude,
-            longitude: target.longitude,
-            plugTypes: target.plugTypes,
-            maxPowerKw: target.maxPowerKw,
-            parkingLevel: target.parkingLevel,
-            howToAccess: target.howToAccess,
-            source: 'community',
-            isVerified: true,
+            id: target.id, name: target.name, operatorName: target.operatorName, address: target.address,
+            city: target.city, state: target.state, latitude: target.latitude, longitude: target.longitude,
+            plugTypes: target.plugTypes, maxPowerKw: target.maxPowerKw, parkingLevel: target.parkingLevel,
+            howToAccess: target.howToAccess, source: 'community', isVerified: true,
           );
         }
       }
@@ -163,7 +132,6 @@ class CommunityRepository {
       }
     } catch (_) {}
 
-    // Offline Fallback
     final review = StationReview(
       id: 'rev-${DateTime.now().millisecondsSinceEpoch}',
       stationId: stationId,
@@ -197,7 +165,6 @@ class CommunityRepository {
       }
     } catch (_) {}
 
-    // Offline Fallback
     final p = prefs ?? await SharedPreferences.getInstance();
     final raw = p.getString('$_reviewsPrefix$stationId');
     if (raw != null) {
@@ -240,7 +207,6 @@ class CommunityRepository {
       }
     } catch (_) {}
 
-    // Offline Fallback: simulate local vote tally and 3-vote consensus threshold
     final p = prefs ?? await SharedPreferences.getInstance();
     final key = '$_surveysPrefix$stationId';
     final existing = p.getString(key);
@@ -277,7 +243,6 @@ class CommunityRepository {
       }
     } catch (_) {}
 
-    // Offline Fallback
     final p = prefs ?? await SharedPreferences.getInstance();
     final raw = p.getString('$_surveysPrefix$stationId');
     if (raw != null) {
@@ -291,5 +256,112 @@ class CommunityRepository {
       );
     }
     return MicroSurveyConsensus(stationId: stationId, totalVotes: 0);
+  }
+
+  /// Propose field updates to an existing charging station (KF06).
+  Future<Map<String, dynamic>> suggestStationEdit(
+    String stationId,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/community/stations/$stationId/suggest-edit',
+        data: payload,
+      );
+      if (response.statusCode == 201 && response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+    } catch (_) {}
+
+    final p = prefs ?? await SharedPreferences.getInstance();
+    final key = '$_editsPrefix$stationId';
+    final existing = p.getString(key);
+    final list = existing != null ? (jsonDecode(existing) as List) : [];
+    final editData = {
+      'id': 'edit-${DateTime.now().millisecondsSinceEpoch}',
+      'station_id': stationId,
+      'author_name': 'EV Driver',
+      'parking_level': payload['parking_level'],
+      'description': payload['description'],
+      'price_per_kwh': payload['price_per_kwh'],
+      'max_power_kw': payload['max_power_kw'],
+      'amenities': payload['amenities'],
+      'is_operational': payload['is_operational'],
+      'confirm_votes': 0,
+      'reject_votes': 0,
+      'status': 'pending',
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    list.insert(0, editData);
+    await p.setString(key, jsonEncode(list));
+    return editData;
+  }
+
+  /// Retrieve all pending edit proposals for a station (KF09).
+  Future<List<Map<String, dynamic>>> fetchPendingStationEdits(String stationId) async {
+    try {
+      final response = await _dio.get('/api/v1/community/stations/$stationId/pending-edits');
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+
+    final p = prefs ?? await SharedPreferences.getInstance();
+    final raw = p.getString('$_editsPrefix$stationId');
+    if (raw != null) {
+      final list = (jsonDecode(raw) as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      return list.where((e) => e['status'] == 'pending').toList();
+    }
+    return [];
+  }
+
+  /// Cast confirm/reject vote or fast-track approve a station edit proposal (KF09).
+  Future<Map<String, dynamic>> voteOnStationEdit(
+    String editId, {
+    required String vote,
+    bool fastTrackApprove = false,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/community/edits/$editId/vote',
+        data: {
+          'vote': vote,
+          'fast_track_approve': fastTrackApprove,
+        },
+      );
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+    } catch (_) {}
+
+    final p = prefs ?? await SharedPreferences.getInstance();
+    final keys = p.getKeys().where((k) => k.startsWith(_editsPrefix));
+    for (final k in keys) {
+      final raw = p.getString(k);
+      if (raw == null) continue;
+      final list = (jsonDecode(raw) as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final idx = list.indexWhere((e) => e['id'] == editId);
+      if (idx != -1) {
+        final item = Map<String, dynamic>.from(list[idx]);
+        if (fastTrackApprove) {
+          item['confirm_votes'] = (item['confirm_votes'] as int? ?? 0) + 1;
+          item['status'] = 'approved';
+        } else if (vote == 'confirm') {
+          final c = (item['confirm_votes'] as int? ?? 0) + 1;
+          item['confirm_votes'] = c;
+          if (c >= 3) item['status'] = 'approved';
+        } else {
+          final r = (item['reject_votes'] as int? ?? 0) + 1;
+          item['reject_votes'] = r;
+          if (r >= 3) item['status'] = 'rejected';
+        }
+        item['updated_at'] = DateTime.now().toIso8601String();
+        list[idx] = item;
+        await p.setString(k, jsonEncode(list));
+        return item;
+      }
+    }
+    return {'id': editId, 'status': fastTrackApprove ? 'approved' : 'pending'};
   }
 }

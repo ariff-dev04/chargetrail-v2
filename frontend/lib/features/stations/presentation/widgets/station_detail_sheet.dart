@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import '../../../auth/presentation/auth_controller.dart';
 import '../../../community/presentation/widgets/micro_survey_card.dart';
+import '../../../community/presentation/widgets/suggest_station_edit_sheet.dart';
 import '../../../routing/presentation/navigation_launcher.dart';
 import '../../../vehicles/presentation/vehicle_controller.dart';
 import '../../domain/station_model.dart';
+import '../station_controller.dart';
+import 'operator_marker_badge.dart';
 
 /// Modal detail sheet showing tariffs, parking level, plugs, active EV charge time, and access steps.
 class StationDetailSheet extends StatelessWidget {
@@ -59,11 +62,7 @@ class StationDetailSheet extends StatelessWidget {
               // Header: Operator, Verified & Bookmark
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: AppTheme.primaryTeal.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
-                    child: Text(station.operatorName ?? 'Community Station', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal)),
-                  ),
+                  OperatorBrandChip(station: station),
                   if (station.isVerified) ...[
                     const SizedBox(width: 6),
                     const Icon(Icons.verified, size: 15, color: Colors.blue),
@@ -141,18 +140,49 @@ class StationDetailSheet extends StatelessWidget {
               ],
 
               const Divider(height: 16),
+              Consumer(
+                builder: (context, ref, _) {
+                  return PendingStationEditsBanner(
+                    stationId: station.id,
+                    onStationMutated: () => ref.read(stationControllerProvider.notifier).loadStations(),
+                  );
+                },
+              ),
               MicroSurveyCard(stationId: station.id),
               const SizedBox(height: 12),
 
-              FilledButton.icon(
-                onPressed: onNavigatePressed ??
-                    () {
-                      Navigator.of(context).pop();
-                      NavigationLauncher.showStationNavigationSheet(context, station);
-                    },
-                icon: const Icon(Icons.directions),
-                label: const Text('Navigate to Station'),
-                style: FilledButton.styleFrom(backgroundColor: AppTheme.primaryTeal, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => SuggestStationEditSheet.show(context, station),
+                      icon: const Icon(Icons.edit_note_rounded, size: 18),
+                      label: const Text('Suggest Edit'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed: onNavigatePressed ??
+                          () {
+                            Navigator.of(context).pop();
+                            NavigationLauncher.showStationNavigationSheet(context, station);
+                          },
+                      icon: const Icon(Icons.directions),
+                      label: const Text('Navigate to Station'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.primaryTeal,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
             ],

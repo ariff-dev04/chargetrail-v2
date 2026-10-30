@@ -186,13 +186,27 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
           BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 10, offset: const Offset(0, 3)),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Route & Battery Simulation', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (state.isLoading) ...[
+              const ClipRRect(
+                borderRadius: BorderRadius.all(Radius.circular(2)),
+                child: LinearProgressIndicator(
+                  minHeight: 3,
+                  backgroundColor: Colors.transparent,
+                  color: AppTheme.primaryTeal,
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Route & Battery Simulation', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               Row(
                 children: [
                   const MapStyleSelectorButton(),
@@ -317,6 +331,7 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
