@@ -315,8 +315,6 @@ class RouteNotifier extends Notifier<RouteState> {
     try {
       final repo = ref.read(routeRepositoryProvider);
       final activeVehicle = ref.read(vehicleControllerProvider).activeVehicle;
-      final vehicleName = '${activeVehicle.brand} ${activeVehicle.modelName}';
-      final isTesla = vehicleName.toLowerCase().contains('tesla');
 
       final plan = await repo.calculateRoutePlan(
         origin: state.selectedOrigin!,
@@ -327,8 +325,6 @@ class RouteNotifier extends Notifier<RouteState> {
         stopStrategy: state.stopStrategy,
         targetArrivalSocPct: state.targetArrivalSocPct,
         preferEasyAccess: state.preferEasyAccess,
-        vehicleName: vehicleName,
-        isTeslaVehicle: isTesla,
       );
 
       if (_disposed) return;

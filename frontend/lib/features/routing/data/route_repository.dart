@@ -157,8 +157,6 @@ class RouteRepository {
     String stopStrategy = 'quickest',
     double targetArrivalSocPct = 20.0,
     bool preferEasyAccess = true,
-    String vehicleName = '',
-    bool isTeslaVehicle = false,
   }) async {
     final payload = {
       'origin_name': origin.name,
@@ -183,8 +181,6 @@ class RouteRepository {
       'stop_strategy': stopStrategy,
       'target_arrival_soc_pct': targetArrivalSocPct,
       'prefer_easy_access': preferEasyAccess,
-      'vehicle_name': vehicleName,
-      'is_tesla_vehicle': isTeslaVehicle,
     };
     try {
       final res = await _dio.post('/api/v1/routing/plan', data: payload);
@@ -201,8 +197,6 @@ class RouteRepository {
       stopStrategy: stopStrategy,
       targetArrivalSocPct: targetArrivalSocPct,
       preferEasyAccess: preferEasyAccess,
-      vehicleName: vehicleName,
-      isTeslaVehicle: isTeslaVehicle,
     );
   }
   Future<RoutePlanResult> _simulateOfflineRoute({
@@ -214,8 +208,6 @@ class RouteRepository {
     String stopStrategy = 'quickest',
     double targetArrivalSocPct = 20.0,
     bool preferEasyAccess = true,
-    String vehicleName = '',
-    bool isTeslaVehicle = false,
   }) async {
     final straightDist = _haversineKm(
       origin.latitude,
@@ -234,13 +226,6 @@ class RouteRepository {
     final usedSoc = (totalEnergyKwh / vehicle.batteryCapacityKwh) * 100.0;
     final projectedDestSoc = (startingSoc - usedSoc).round();
     final allStations = await StationLocalCache().getCachedStations();
-    final isTeslaDriver = isTeslaVehicle ||
-        vehicleName.toLowerCase().contains('tesla') ||
-        vehicle.displayName.toLowerCase().contains('tesla');
-    bool isTesla(ChargingStation s) {
-      final t = '${s.name} ${s.operatorName}'.toLowerCase();
-      return t.contains('tesla') || t.contains('supercharger');
-    }
     final corridorStations = allStations
         .where((s) => _isDirectionallyCompatible(
               stationName: s.name,
@@ -280,13 +265,13 @@ class RouteRepository {
           chosenStation = corridorStations.firstWhere(
             (s) => preferredStopStationIds.contains(s.id),
             orElse: () => corridorStations.firstWhere(
-              (s) => isTeslaDriver && isTesla(s) ? true : s.name.contains('Tapah'),
+              (s) => s.name.contains('Tapah'),
               orElse: () => corridorStations.first,
             ),
           );
         } else {
           chosenStation = corridorStations.firstWhere(
-            (s) => isTeslaDriver && isTesla(s) ? true : s.name.contains('Tapah'),
+            (s) => s.name.contains('Tapah'),
             orElse: () => corridorStations.first,
           );
         }
@@ -309,14 +294,10 @@ class RouteRepository {
         final detourFromPoly = polyline
             .map((p) => _haversineKm(p.latitude, p.longitude, s.latitude, s.longitude))
             .fold(double.infinity, min);
-        final maxAllowedDetour = (isTeslaDriver && isTesla(s)) ? 12.0 : 5.0;
-        return detourFromPoly <= maxAllowedDetour;
+        return detourFromPoly <= 5.0;
       }).toList();
 
       alternatives.sort((a, b) {
-        final aTesla = isTeslaDriver && isTesla(a);
-        final bTesla = isTeslaDriver && isTesla(b);
-        if (aTesla != bTesla) return aTesla ? -1 : 1;
         final aText = '${a.name} ${a.parkingLevel}'.toLowerCase();
         final bText = '${b.name} ${b.parkingLevel}'.toLowerCase();
         final aIsRR = aText.contains('r&r') ||
