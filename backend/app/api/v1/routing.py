@@ -1,6 +1,7 @@
 """REST API endpoints for Malaysian place geocoding and battery route planning."""
 
 from fastapi import APIRouter, Depends
+from pydantic.fields import FieldInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -20,6 +21,19 @@ router = APIRouter(prefix="/routing", tags=["Routing"])
 settings = get_settings()
 
 geocoding_service = GeocodingService()
+
+# Ensure RoutePlanRequest schema supports stop_strategy, target_arrival_soc_pct, and prefer_easy_access
+if "stop_strategy" not in RoutePlanRequest.model_fields:
+    RoutePlanRequest.model_fields["stop_strategy"] = FieldInfo(
+        annotation=str, default="quickest", description="few_long | quickest | short_many"
+    )
+    RoutePlanRequest.model_fields["target_arrival_soc_pct"] = FieldInfo(
+        annotation=float, default=15.0, description="Target arrival SoC (5.0 - 50.0)"
+    )
+    RoutePlanRequest.model_fields["prefer_easy_access"] = FieldInfo(
+        annotation=bool, default=True, description="Prioritize open bay and highway R&R"
+    )
+    RoutePlanRequest.model_rebuild(force=True)
 
 
 def get_route_planner_service(
