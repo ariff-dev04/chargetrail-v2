@@ -19,62 +19,13 @@ class RouteRepository {
               ),
             );
   static List<PlaceSuggestion> get defaultHubs => const [
-        PlaceSuggestion(
-          name: 'Kuala Lumpur (KLCC)',
-          city: 'Kuala Lumpur',
-          state: 'Kuala Lumpur',
-          latitude: 3.1578,
-          longitude: 101.7118,
-          category: 'mall',
-        ),
-        PlaceSuggestion(
-          name: 'Penang (Gurney Plaza)',
-          city: 'George Town',
-          state: 'Penang',
-          latitude: 5.4372,
-          longitude: 100.3096,
-          category: 'mall',
-        ),
-        PlaceSuggestion(
-          name: 'Putrajaya (IOI City Mall)',
-          city: 'Putrajaya',
-          state: 'Putrajaya',
-          latitude: 2.9698,
-          longitude: 101.7135,
-          category: 'mall',
-        ),
-        PlaceSuggestion(
-          name: 'Johor Bahru (Mid Valley Southkey)',
-          city: 'Johor Bahru',
-          state: 'Johor',
-          latitude: 1.4989,
-          longitude: 103.7774,
-          category: 'mall',
-        ),
-        PlaceSuggestion(
-          name: 'Tapah RSA (North-South Highway)',
-          city: 'Tapah',
-          state: 'Perak',
-          latitude: 4.3138,
-          longitude: 101.2582,
-          category: 'highway_rsa',
-        ),
-        PlaceSuggestion(
-          name: 'Petaling Jaya (Sunway Pyramid)',
-          city: 'Petaling Jaya',
-          state: 'Selangor',
-          latitude: 3.0733,
-          longitude: 101.6078,
-          category: 'mall',
-        ),
-        PlaceSuggestion(
-          name: 'Melaka (Ayer Keroh)',
-          city: 'Ayer Keroh',
-          state: 'Melaka',
-          latitude: 2.2740,
-          longitude: 102.2850,
-          category: 'city',
-        ),
+        PlaceSuggestion(name: 'Kuala Lumpur (KLCC)', city: 'Kuala Lumpur', state: 'Kuala Lumpur', latitude: 3.1578, longitude: 101.7118, category: 'mall'),
+        PlaceSuggestion(name: 'Penang (Gurney Plaza)', city: 'George Town', state: 'Penang', latitude: 5.4372, longitude: 100.3096, category: 'mall'),
+        PlaceSuggestion(name: 'Putrajaya (IOI City Mall)', city: 'Putrajaya', state: 'Putrajaya', latitude: 2.9698, longitude: 101.7135, category: 'mall'),
+        PlaceSuggestion(name: 'Johor Bahru (Mid Valley Southkey)', city: 'Johor Bahru', state: 'Johor', latitude: 1.4989, longitude: 103.7774, category: 'mall'),
+        PlaceSuggestion(name: 'Tapah RSA (North-South Highway)', city: 'Tapah', state: 'Perak', latitude: 4.3138, longitude: 101.2582, category: 'highway_rsa'),
+        PlaceSuggestion(name: 'Petaling Jaya (Sunway Pyramid)', city: 'Petaling Jaya', state: 'Selangor', latitude: 3.0733, longitude: 101.6078, category: 'mall'),
+        PlaceSuggestion(name: 'Melaka (Ayer Keroh)', city: 'Ayer Keroh', state: 'Melaka', latitude: 2.2740, longitude: 102.2850, category: 'city'),
       ];
   Future<List<PlaceSuggestion>> searchPlaces(String query) async {
     final q = query.trim().toLowerCase();
@@ -203,6 +154,9 @@ class RouteRepository {
     required VehicleProfile vehicle,
     required int startingSocPercent,
     List<String> preferredStopStationIds = const [],
+    String stopStrategy = 'quickest',
+    double targetArrivalSocPct = 20.0,
+    bool preferEasyAccess = true,
   }) async {
     final payload = {
       'origin_name': origin.name,
@@ -224,6 +178,9 @@ class RouteRepository {
       'reserve_soc_percent': vehicle.reserveSocPercent,
       'corridor_radius_km': 25.0,
       'preferred_stop_station_ids': preferredStopStationIds,
+      'stop_strategy': stopStrategy,
+      'target_arrival_soc_pct': targetArrivalSocPct,
+      'prefer_easy_access': preferEasyAccess,
     };
     try {
       final res = await _dio.post('/api/v1/routing/plan', data: payload);
@@ -237,6 +194,9 @@ class RouteRepository {
       vehicle: vehicle,
       startingSoc: startingSocPercent,
       preferredStopStationIds: preferredStopStationIds,
+      stopStrategy: stopStrategy,
+      targetArrivalSocPct: targetArrivalSocPct,
+      preferEasyAccess: preferEasyAccess,
     );
   }
   Future<RoutePlanResult> _simulateOfflineRoute({
@@ -245,6 +205,9 @@ class RouteRepository {
     required VehicleProfile vehicle,
     required int startingSoc,
     List<String> preferredStopStationIds = const [],
+    String stopStrategy = 'quickest',
+    double targetArrivalSocPct = 20.0,
+    bool preferEasyAccess = true,
   }) async {
     final straightDist = _haversineKm(
       origin.latitude,
@@ -282,7 +245,17 @@ class RouteRepository {
         'Destination reachable safely with $projectedDestSoc% battery remaining.';
     int totalChargeMins = 0;
     final polyline = roadPolyline ?? _synthesizeOfflinePolyline(origin, destination);
-    if (projectedDestSoc < vehicle.reserveSocPercent) {
+
+    final int triggerSoc = stopStrategy == 'few_long'
+        ? max(10, (targetArrivalSocPct - 5).round())
+        : (stopStrategy == 'short_many'
+            ? max(30, (targetArrivalSocPct + 10).round())
+            : max(15, targetArrivalSocPct.round()));
+    final int departureSoc = stopStrategy == 'few_long'
+        ? 95
+        : (stopStrategy == 'short_many' ? 65 : 80);
+
+    if (projectedDestSoc < targetArrivalSocPct.round()) {
       status = 'critical_charging_required';
       summary =
           'Battery depletion risk: Route requires ${usedSoc.round()}% battery. Charging stop recommended.';
@@ -302,8 +275,7 @@ class RouteRepository {
             orElse: () => corridorStations.first,
           );
         }
-      final arrivalSoc = max((startingSoc - 35), 15);
-      const departureSoc = 80;
+      final arrivalSoc = max((startingSoc - 35), triggerSoc);
       final addedKwh =
           ((departureSoc - arrivalSoc) / 100.0) * vehicle.batteryCapacityKwh;
       final effectiveKw = min(chosenStation.maxPowerKw, vehicle.maxDcChargeKw);
