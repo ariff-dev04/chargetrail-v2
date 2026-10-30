@@ -5,7 +5,7 @@ Configures middleware, API routers, and application lifecycle events.
 
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +30,10 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        with suppress(Exception):
+            await conn.exec_driver_sql(
+                "ALTER TABLE charging_stations ADD COLUMN is_community_verified BOOLEAN NOT NULL DEFAULT 0"
+            )
 
     yield
     logger.info("Shutting down %s...", settings.PROJECT_NAME)
