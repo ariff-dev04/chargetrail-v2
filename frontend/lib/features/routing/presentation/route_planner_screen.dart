@@ -5,6 +5,7 @@ import 'package:frontend/core/config/map_tile_config.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/features/stations/presentation/widgets/station_detail_sheet.dart';
 import 'package:latlong2/latlong.dart';
+import '../../stations/domain/station_model.dart';
 import '../domain/route_models.dart';
 import 'route_controller.dart';
 import 'widgets/route_search_card.dart';
@@ -117,8 +118,15 @@ class _RoutePlannerScreenState extends ConsumerState<RoutePlannerScreen> {
                             ],
                           ),
                         ),
-                      ...plan.corridorStations
-                          .where((cs) => !plan.recommendedStops.any((rs) => rs.station.id == cs.id))
+                      ...plan.recommendedStops
+                          .expand((s) => s.nearbyAlternatives)
+                          .fold<Map<String, ChargingStation>>({}, (map, s) {
+                            if (!plan.recommendedStops.any((rs) => rs.station.id == s.id)) {
+                              map[s.id] = s;
+                            }
+                            return map;
+                          })
+                          .values
                           .map((station) => Marker(
                                 point: LatLng(station.latitude, station.longitude),
                                 width: 26,

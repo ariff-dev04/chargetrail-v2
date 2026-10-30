@@ -286,6 +286,31 @@ class _RouteSearchCardState extends ConsumerState<RouteSearchCard> {
                                 ),
                               ],
                             ),
+                            if ('${vehicle.brand} ${vehicle.modelName}'.toLowerCase().contains('tesla')) ...[
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE82127).withValues(alpha: isDark ? 0.22 : 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFE82127).withValues(alpha: 0.5)),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.bolt_rounded, color: Color(0xFFE82127), size: 15),
+                                    SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        'Tesla Supercharger Priority Active • Includes Toll-Exit & Mall Hubs',
+                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFE82127)),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

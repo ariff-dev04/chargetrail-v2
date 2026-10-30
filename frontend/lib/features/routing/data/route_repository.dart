@@ -187,7 +187,14 @@ class RouteRepository {
       'is_tesla_vehicle': isTeslaVehicle,
     };
     try {
-      final res = await _dio.post('/api/v1/routing/plan', data: payload);
+      final res = await _dio.post(
+        '/api/v1/routing/plan',
+        data: payload,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 20),
+          sendTimeout: const Duration(seconds: 15),
+        ),
+      );
       if (res.statusCode == 200 && res.data is Map<String, dynamic>) {
         return RoutePlanResult.fromJson(res.data as Map<String, dynamic>);
       }

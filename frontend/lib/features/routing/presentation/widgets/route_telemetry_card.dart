@@ -305,27 +305,59 @@ class _RouteTelemetryCardState extends ConsumerState<RouteTelemetryCard> {
   }
 
   Widget _buildActiveEvPill(VehicleProfile vehicle, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryTeal.withValues(alpha: isDark ? 0.2 : 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.primaryTeal.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.electric_car, color: AppTheme.primaryTeal, size: 15),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              'Active EV: ${vehicle.brand} ${vehicle.modelName} (${vehicle.batteryCapacityKwh.toStringAsFixed(0)} kWh • ${vehicle.connectorType} • ${vehicle.maxDcChargeKw.toStringAsFixed(0)}kW Max)',
-              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+    final isTesla = '${vehicle.brand} ${vehicle.modelName}'.toLowerCase().contains('tesla');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryTeal.withValues(alpha: isDark ? 0.2 : 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.primaryTeal.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.electric_car, color: AppTheme.primaryTeal, size: 15),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Active EV: ${vehicle.brand} ${vehicle.modelName} (${vehicle.batteryCapacityKwh.toStringAsFixed(0)} kWh • ${vehicle.connectorType} • ${vehicle.maxDcChargeKw.toStringAsFixed(0)}kW Max)',
+                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.primaryTeal),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (isTesla) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE82127).withValues(alpha: isDark ? 0.22 : 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE82127).withValues(alpha: 0.5)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.bolt_rounded, color: Color(0xFFE82127), size: 15),
+                SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'Tesla Supercharger Priority Active • Includes Toll-Exit & Mall Hubs',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFE82127)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 
