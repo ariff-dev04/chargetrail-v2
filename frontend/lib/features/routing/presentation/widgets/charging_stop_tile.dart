@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../stations/presentation/widgets/operator_marker_badge.dart';
 import '../../../stations/presentation/widgets/station_detail_sheet.dart';
 import '../../domain/route_models.dart';
 import '../navigation_launcher.dart';
 import '../route_controller.dart';
 
-/// Single charging stop card with ABRP-style vicinity alternative stop switcher.
+/// Single charging stop card with ABRP-style vertical timeline node and vicinity alternative stop switcher.
 class ChargingStopTile extends ConsumerWidget {
   final int stopIndex;
   final ChargingStopRecommendation stop;
@@ -19,119 +20,174 @@ class ChargingStopTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final idx = stopIndex + 1;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final operatorTheme = OperatorBrandTheme.fromStation(stop.station);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 13,
-                  backgroundColor: AppTheme.ultraFastColor,
-                  child: Text(
-                    '$idx',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => StationDetailSheet.show(context, stop.station),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          stop.station.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${stop.distanceFromOriginKm} km from start • ${stop.station.operatorName} • ${stop.station.maxPowerKw.toInt()} kW',
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+            // Left vertical timeline node
+            SizedBox(
+              width: 52,
+              child: Column(
+                children: [
+                  Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEA580C),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: const Color(0xFFEA580C).withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 2)),
                       ],
                     ),
+                    child: const Center(
+                      child: Icon(Icons.flash_on_rounded, color: Colors.white, size: 16),
+                    ),
                   ),
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                  icon: const Icon(Icons.directions, color: AppTheme.primaryTeal, size: 20),
-                  tooltip: 'Navigate',
-                  onPressed: () => NavigationLauncher.showStopNavigationPicker(
-                    context,
-                    stationName: stop.station.name,
-                    lat: stop.station.latitude,
-                    lng: stop.station.longitude,
-                    city: stop.station.city,
-                  ),
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                  icon: const Icon(Icons.info_outline, size: 18),
-                  tooltip: 'Access Guide',
-                  onPressed: () => StationDetailSheet.show(context, stop.station),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.cardDark : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+                  const SizedBox(height: 3),
                   Text(
-                    'Arrive ${stop.arrivalSocPercent}% ➔ ${stop.departureSocPercent}%',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                    '${stop.estimatedChargeMinutes} min',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFEA580C)),
                   ),
-                  Text(
-                    '${formatDurationMinutes(stop.estimatedChargeMinutes)} (RM ${stop.estimatedCostMyr.toStringAsFixed(2)})',
-                    style: const TextStyle(fontSize: 11, color: AppTheme.primaryTeal, fontWeight: FontWeight.bold),
+                  const SizedBox(height: 4),
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: isDark ? 0.3 : 0.25),
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-            if (stop.nearbyAlternatives.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: ActionChip(
-                  key: Key('swap_stop_button_$stopIndex'),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  backgroundColor: AppTheme.primaryTeal.withValues(alpha: 0.12),
-                  side: BorderSide(color: AppTheme.primaryTeal.withValues(alpha: 0.4)),
-                  avatar: const Icon(Icons.swap_horiz, size: 14, color: AppTheme.primaryTeal),
-                  label: Text(
-                    'Swap Stop (${stop.nearbyAlternatives.length} in vicinity)',
-                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppTheme.primaryTeal),
-                  ),
-                  onPressed: () => _showVicinitySwapSheet(context, ref),
+            const SizedBox(width: 6),
+
+            // Right stop card
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.cardDark : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.22)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 1)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => StationDetailSheet.show(context, stop.station),
+                            child: Text(
+                              '[${operatorTheme.label}] ${stop.station.name}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        InkWell(
+                          key: Key('swap_stop_button_$stopIndex'),
+                          onTap: () => _showVicinitySwapSheet(context, ref),
+                          borderRadius: BorderRadius.circular(14),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.tune_rounded, size: 18, color: AppTheme.primaryTeal),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => NavigationLauncher.showStopNavigationPicker(
+                            context,
+                            stationName: stop.station.name,
+                            lat: stop.station.latitude,
+                            lng: stop.station.longitude,
+                            city: stop.station.city,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.directions_rounded, size: 20, color: AppTheme.primaryTeal),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Subtitle row: SoC progress, kW badge, access badge
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.battery_4_bar_rounded, size: 14, color: AppTheme.primaryTeal),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${stop.arrivalSocPercent}% → ${stop.departureSocPercent}%',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: AppTheme.successGreen.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${stop.station.maxPowerKw.toInt()} kW',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.successGreen),
+                          ),
+                        ),
+                        if (stop.station.parkingLevel != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              stop.station.parkingLevel!,
+                              style: const TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${stop.distanceFromOriginKm} km • RM ${stop.estimatedCostMyr.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                        ),
+                        if (stop.nearbyAlternatives.isNotEmpty)
+                          InkWell(
+                            onTap: () => _showVicinitySwapSheet(context, ref),
+                            child: Text(
+                              'Swap Stop (${stop.nearbyAlternatives.length} in vicinity)',
+                              style: const TextStyle(fontSize: 10.5, color: AppTheme.primaryTeal, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
