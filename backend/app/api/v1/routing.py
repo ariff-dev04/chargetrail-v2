@@ -22,7 +22,7 @@ settings = get_settings()
 
 geocoding_service = GeocodingService()
 
-# Ensure RoutePlanRequest schema supports stop_strategy, target_arrival_soc_pct, and prefer_easy_access
+# Ensure RoutePlanRequest schema supports stop_strategy, target_arrival_soc_pct, prefer_easy_access, and vehicle info
 if "stop_strategy" not in RoutePlanRequest.model_fields:
     RoutePlanRequest.model_fields["stop_strategy"] = FieldInfo(
         annotation=str, default="quickest", description="few_long | quickest | short_many"
@@ -32,6 +32,12 @@ if "stop_strategy" not in RoutePlanRequest.model_fields:
     )
     RoutePlanRequest.model_fields["prefer_easy_access"] = FieldInfo(
         annotation=bool, default=True, description="Prioritize open bay and highway R&R"
+    )
+    RoutePlanRequest.model_fields["vehicle_name"] = FieldInfo(
+        annotation=str, default="", description="Vehicle make and model name"
+    )
+    RoutePlanRequest.model_fields["is_tesla_vehicle"] = FieldInfo(
+        annotation=bool, default=False, description="Flag indicating if EV is a Tesla"
     )
     RoutePlanRequest.model_rebuild(force=True)
 
