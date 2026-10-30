@@ -5,6 +5,8 @@ import '../../vehicles/presentation/vehicle_controller.dart';
 import '../data/route_repository.dart';
 import '../domain/route_models.dart';
 
+typedef RoutePlannerState = RouteState;
+
 /// State representation for journey route planning and battery simulation.
 class RouteState {
   final PlaceSuggestion? selectedOrigin;
@@ -14,6 +16,10 @@ class RouteState {
   final List<String> preferredStopIds;
   final bool isLoading;
   final String? errorMessage;
+  final String stopStrategy; // few_long, quickest, short_many
+  final double targetArrivalSocPct;
+  final bool preferEasyAccess;
+  final bool isMoreOptionsExpanded;
 
   const RouteState({
     PlaceSuggestion? selectedOrigin,
@@ -25,30 +31,20 @@ class RouteState {
     this.preferredStopIds = const [],
     this.isLoading = false,
     this.errorMessage,
+    this.stopStrategy = 'quickest',
+    this.targetArrivalSocPct = 20.0,
+    this.preferEasyAccess = true,
+    this.isMoreOptionsExpanded = false,
   })  : selectedOrigin = selectedOrigin ?? origin,
         selectedDestination = selectedDestination ?? destination;
 
   /// Convenient accessor returning selectedOrigin or an empty PlaceSuggestion placeholder.
   PlaceSuggestion get origin =>
-      selectedOrigin ??
-      const PlaceSuggestion(
-        name: '',
-        city: '',
-        state: '',
-        latitude: 0.0,
-        longitude: 0.0,
-      );
+      selectedOrigin ?? const PlaceSuggestion(name: '', city: '', state: '', latitude: 0.0, longitude: 0.0);
 
   /// Convenient accessor returning selectedDestination or an empty PlaceSuggestion placeholder.
   PlaceSuggestion get destination =>
-      selectedDestination ??
-      const PlaceSuggestion(
-        name: '',
-        city: '',
-        state: '',
-        latitude: 0.0,
-        longitude: 0.0,
-      );
+      selectedDestination ?? const PlaceSuggestion(name: '', city: '', state: '', latitude: 0.0, longitude: 0.0);
 
   bool get hasValidEndpoints =>
       selectedOrigin != null &&
@@ -70,13 +66,13 @@ class RouteState {
     bool? isLoading,
     String? errorMessage,
     bool clearErrorMessage = false,
+    String? stopStrategy,
+    double? targetArrivalSocPct,
+    bool? preferEasyAccess,
+    bool? isMoreOptionsExpanded,
   }) {
-    final newOrigin = clearSelectedOrigin
-        ? null
-        : (selectedOrigin ?? origin ?? this.selectedOrigin);
-    final newDestination = clearSelectedDestination
-        ? null
-        : (selectedDestination ?? destination ?? this.selectedDestination);
+    final newOrigin = clearSelectedOrigin ? null : (selectedOrigin ?? origin ?? this.selectedOrigin);
+    final newDestination = clearSelectedDestination ? null : (selectedDestination ?? destination ?? this.selectedDestination);
 
     return RouteState(
       selectedOrigin: newOrigin,
@@ -86,6 +82,10 @@ class RouteState {
       preferredStopIds: preferredStopIds ?? this.preferredStopIds,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      stopStrategy: stopStrategy ?? this.stopStrategy,
+      targetArrivalSocPct: targetArrivalSocPct ?? this.targetArrivalSocPct,
+      preferEasyAccess: preferEasyAccess ?? this.preferEasyAccess,
+      isMoreOptionsExpanded: isMoreOptionsExpanded ?? this.isMoreOptionsExpanded,
     );
   }
 }
@@ -174,6 +174,47 @@ class RouteNotifier extends Notifier<RouteState> {
     if (recalculate && state.hasValidEndpoints) {
       calculateRoute();
     }
+  }
+
+  /// Update charging stop strategy (few_long, quickest, short_many).
+  void setStopStrategy(String strategy, {bool recalculate = false}) {
+    state = state.copyWith(stopStrategy: strategy);
+    if (recalculate && state.hasValidEndpoints) {
+      calculateRoute();
+    }
+  }
+
+  /// Update desired arrival buffer SoC percentage at final destination.
+  void setTargetArrivalSoc(double val, {bool recalculate = false}) {
+    state = state.copyWith(targetArrivalSocPct: val.clamp(5.0, 50.0));
+    if (recalculate && state.hasValidEndpoints) {
+      calculateRoute();
+    }
+  }
+
+  /// Toggle easy-access preference (Highway R&R and open public bays over indoor carparks).
+  void togglePreferEasyAccess(bool val, {bool recalculate = false}) {
+    state = state.copyWith(preferEasyAccess: val);
+    if (recalculate && state.hasValidEndpoints) {
+      calculateRoute();
+    }
+  }
+
+  /// Toggle expansion of advanced strategy and vehicle configuration options.
+  void toggleMoreOptions() {
+    state = state.copyWith(isMoreOptionsExpanded: !state.isMoreOptionsExpanded);
+  }
+
+  /// Reset origin, destination, and active route plan (e.g. Clear / Restart button).
+  void clearRouteInputs() {
+    state = state.copyWith(
+      clearSelectedOrigin: true,
+      clearSelectedDestination: true,
+      clearCurrentPlan: true,
+      clearErrorMessage: true,
+      preferredStopIds: const [],
+      isLoading: false,
+    );
   }
 
   /// Search places via repository.
@@ -281,6 +322,9 @@ class RouteNotifier extends Notifier<RouteState> {
         vehicle: activeVehicle,
         startingSocPercent: state.startingSocPercent,
         preferredStopStationIds: state.preferredStopIds,
+        stopStrategy: state.stopStrategy,
+        targetArrivalSocPct: state.targetArrivalSocPct,
+        preferEasyAccess: state.preferEasyAccess,
       );
 
       if (_disposed) return;
