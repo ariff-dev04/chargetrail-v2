@@ -32,6 +32,8 @@ if "stop_strategy" not in RoutePlanRequest.model_fields:
         annotation=float, default=15.0
     )
     RoutePlanRequest.model_fields["prefer_easy_access"] = FieldInfo(annotation=bool, default=True)
+    RoutePlanRequest.model_fields["vehicle_name"] = FieldInfo(annotation=str, default="")
+    RoutePlanRequest.model_fields["is_tesla_vehicle"] = FieldInfo(annotation=bool, default=False)
     RoutePlanRequest.model_rebuild(force=True)
 
 
@@ -53,6 +55,11 @@ class RoutePlannerService:
     async def plan_route(self, request: RoutePlanRequest) -> RoutePlanResponse:
         """Execute battery-aware journey simulation and recommend optimized charging stops."""
         b_kwh, eff, kw, conn, res, v_label = await self._resolve_vehicle_specs(request)
+        is_tesla_driver = bool(
+            getattr(request, "is_tesla_vehicle", False)
+            or "tesla" in str(getattr(request, "vehicle_name", "") or "").lower()
+            or "tesla" in v_label.lower()
+        )
         pts, dist_km, drive_mins = await self.osrm_client.fetch_route(
             origin_lat=request.origin_lat,
             origin_lng=request.origin_lng,
@@ -62,7 +69,9 @@ class RoutePlannerService:
         total_energy = round((dist_km * eff) / 1000.0, 2)
         used_soc = (total_energy / b_kwh) * 100.0
         proj_soc = round(request.starting_soc_percent - used_soc)
-        cand = await self._find_corridor_candidates(pts, request, conn)
+        cand = await self._find_corridor_candidates(
+            pts, request, conn, is_tesla_driver=is_tesla_driver
+        )
         t_arr = max(5.0, min(50.0, float(getattr(request, "target_arrival_soc_pct", 15.0) or 15.0)))
         code, summary = self._classify_range_anxiety(
             proj_soc, round(t_arr), request.starting_soc_percent, round(used_soc)
@@ -143,7 +152,11 @@ class RoutePlannerService:
         return [x for r in res if isinstance(r, list) for x in r]
 
     async def _find_corridor_candidates(
-        self, points: list[LatLngPoint], req: RoutePlanRequest, connector: str
+        self,
+        points: list[LatLngPoint],
+        req: RoutePlanRequest,
+        connector: str,
+        is_tesla_driver: bool = False,
     ) -> list[_CorridorCandidate]:
         if not points:
             return []
@@ -195,6 +208,7 @@ class RoutePlannerService:
             dest_lat=d_lat,
             max_corridor_detour=min(req.corridor_radius_km, 5.0),
             prefer_easy_access=bool(getattr(req, "prefer_easy_access", True)),
+            is_tesla_driver=is_tesla_driver,
         )
 
     def _classify_range_anxiety(

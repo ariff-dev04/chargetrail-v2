@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../stations/domain/station_model.dart';
 import '../../../stations/presentation/widgets/operator_marker_badge.dart';
 import '../../../stations/presentation/widgets/station_detail_sheet.dart';
 import '../../domain/route_models.dart';
@@ -123,7 +124,7 @@ class ChargingStopTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
 
-                    // Subtitle row: SoC progress, kW badge, access badge
+                    // Subtitle row: SoC progress, kW badge, parking badge
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
@@ -167,6 +168,10 @@ class ChargingStopTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 6),
 
+                    // Access & Toll-Exit Advisory Chip
+                    _buildAccessAdvisoryChip(stop.station, isDark),
+                    const SizedBox(height: 6),
+
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -194,12 +199,54 @@ class ChargingStopTile extends ConsumerWidget {
     );
   }
 
+  Widget _buildAccessAdvisoryChip(ChargingStation station, bool isDark) {
+    final name = station.name.toLowerCase();
+    final op = (station.operatorName ?? '').toLowerCase();
+    final isTesla = name.contains('tesla') || name.contains('supercharger') || op.contains('tesla');
+    final pLevel = (station.parkingLevel ?? '').toLowerCase();
+    final isIndoorOrMall = pLevel.contains('multi-storey') || pLevel.contains('indoor') || pLevel.contains('carpark') || name.contains('mall') || name.contains('outlet');
+    final isRnR = pLevel.contains('highway r&r') || name.contains('r&r') || name.contains('rsa');
+
+    final Color bgColor;
+    final Color fgColor;
+    final IconData icon;
+    final String label;
+
+    if (isTesla || isIndoorOrMall) {
+      bgColor = isTesla ? const Color(0xFFDC2626).withValues(alpha: 0.12) : Colors.amber.withValues(alpha: 0.15);
+      fgColor = isTesla ? const Color(0xFFDC2626) : (isDark ? Colors.amber[300]! : Colors.amber[900]!);
+      icon = Icons.alt_route_rounded;
+      label = isTesla ? 'Tesla Supercharger • Exit Highway / Mall Parking' : 'Toll Exit Detour • Mall / Paid Parking';
+    } else if (isRnR) {
+      bgColor = AppTheme.successGreen.withValues(alpha: 0.14);
+      fgColor = AppTheme.successGreen;
+      icon = Icons.add_road_rounded;
+      label = 'Direct Highway R&R • Easy Access';
+    } else {
+      bgColor = AppTheme.primaryTeal.withValues(alpha: 0.12);
+      fgColor = AppTheme.primaryTeal;
+      icon = Icons.local_parking_rounded;
+      label = 'Open Public Bay • Check Exit Access';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(6), border: Border.all(color: fgColor.withValues(alpha: 0.35))),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: fgColor),
+          const SizedBox(width: 4),
+          Flexible(child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fgColor), maxLines: 1, overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    );
+  }
+
   void _showVicinitySwapSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet<void>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) {
         return SafeArea(
           child: Padding(
@@ -212,22 +259,11 @@ class ChargingStopTile extends ConsumerWidget {
                   children: [
                     const Icon(Icons.alt_route, color: AppTheme.primaryTeal, size: 20),
                     const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Vicinity Chargers Along Corridor',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 18),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
+                    const Expanded(child: Text('Vicinity Chargers Along Corridor', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold))),
+                    IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => Navigator.pop(ctx)),
                   ],
                 ),
-                Text(
-                  'Current stop #${stopIndex + 1}: ${stop.station.name}',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
+                Text('Current stop #${stopIndex + 1}: ${stop.station.name}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                 const Divider(height: 16),
                 Flexible(
                   child: ListView.separated(
@@ -244,27 +280,13 @@ class ChargingStopTile extends ConsumerWidget {
                           backgroundColor: AppTheme.primaryTeal.withValues(alpha: 0.15),
                           child: const Icon(Icons.ev_station, color: AppTheme.primaryTeal, size: 18),
                         ),
-                        title: Text(
-                          alt.name,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          '${alt.operatorName} • ${alt.maxPowerKw.toInt()} kW • ${alt.city}\n${alt.parkingLevel}',
-                          style: const TextStyle(fontSize: 10),
-                          maxLines: 2,
-                        ),
+                        title: Text(alt.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        subtitle: Text('${alt.operatorName} • ${alt.maxPowerKw.toInt()} kW • ${alt.city}\n${alt.parkingLevel}', style: const TextStyle(fontSize: 10), maxLines: 2),
                         trailing: ElevatedButton(
                           key: Key('prioritize_stop_${alt.id}'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryTeal,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            minimumSize: const Size(80, 30),
-                          ),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryTeal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), minimumSize: const Size(80, 30)),
                           onPressed: () {
-                            ref
-                                .read(routeControllerProvider.notifier)
-                                .swapStopStation(stopIndex, alt);
+                            ref.read(routeControllerProvider.notifier).swapStopStation(stopIndex, alt);
                             Navigator.pop(ctx);
                           },
                           child: const Text('Prioritize Stop', style: TextStyle(fontSize: 11)),

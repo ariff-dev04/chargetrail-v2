@@ -205,3 +205,36 @@ def test_stop_strategy_thresholds_and_charge_targets() -> None:
     assert eval_strat("few_long") == 95
     assert eval_strat("quickest") == 80
     assert eval_strat("short_many") == 65
+
+
+def test_tesla_driver_prioritizes_exit_supercharger_and_preserves_standard_ev_rnr() -> None:
+    """Non-Tesla EV prefers direct highway R&R, while Tesla EV prioritizes exit Supercharger."""
+    rnr = mk_st(301, "Gentari R&R (NB)", "PLUS E2", 2.4, 102.2, 120.0, "Highway R&R / Open Bay")
+    tesla = mk_st(302, "Tesla Supercharger", "Exit", 2.4, 102.23, 250.0, "Multi-Storey / Carpark")
+
+    # 1. Non-Tesla driver: direct R&R beats mall/indoor Tesla Supercharger
+    sc_non_rnr = score_candidate_station(rnr, 0.3, "left", prefer_easy_access=True)
+    sc_non_sc = score_candidate_station(tesla, 3.2, "center", prefer_easy_access=True)
+    assert sc_non_rnr < sc_non_sc
+
+    # 2. Tesla driver: carpark penalty is bypassed and affinity bonus is granted
+    sc_tes_rnr = score_candidate_station(
+        rnr, 0.3, "left", prefer_easy_access=True, is_tesla_driver=True
+    )
+    sc_tes_sc = score_candidate_station(
+        tesla, 3.2, "center", prefer_easy_access=True, is_tesla_driver=True
+    )
+    assert sc_tes_sc < sc_tes_rnr
+    assert sc_non_rnr == sc_tes_rnr
+
+    # 3. Corridor candidates filtering with 2.5 km threshold
+    pts = [
+        LatLngPoint(latitude=lat, longitude=lng)
+        for lat, lng in [(2.2, 102.2), (2.4, 102.2), (2.6, 102.2)]
+    ]
+    cand_std = build_corridor_candidates([rnr, tesla], pts, 2.2, 2.6, 2.5, is_tesla_driver=False)
+    assert [c.station.name for c in cand_std] == [rnr.name]
+
+    cand_tesla = build_corridor_candidates([rnr, tesla], pts, 2.2, 2.6, 2.5, is_tesla_driver=True)
+    cand_names = [c.station.name for c in cand_tesla]
+    assert tesla.name in cand_names and rnr.name in cand_names

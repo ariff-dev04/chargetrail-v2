@@ -112,6 +112,12 @@ def compute_cross_track_distance_m(
     return math.hypot(sx, sy) if seg_len < 1e-6 else abs(dx * sy - dy * sx) / seg_len
 
 
+def is_tesla_station(station_name: str, operator_name: str = "") -> bool:
+    """Return True if station or operator name indicates a Tesla Supercharger / destination charger."""
+    s = f"{station_name.lower()} {operator_name.lower()}"
+    return "tesla" in s or "supercharger" in s
+
+
 def is_opposite_highway_direction(
     station_name: str, station_address: str, segment_bearing_deg: float
 ) -> bool:
@@ -151,6 +157,7 @@ def score_candidate_station(
     side: str = "center",
     cross_track_m: float = 0.0,
     prefer_easy_access: bool = False,
+    is_tesla_driver: bool = False,
 ) -> float:
     """Deterministically score candidate charger based on detour, side, access ease, and power."""
     score = detour_km * 2.0
@@ -158,6 +165,7 @@ def score_candidate_station(
     score -= min(power_kw, 350.0) * 0.1
 
     name = str(getattr(station, "name", "") or "").lower()
+    op_name = str(getattr(station, "operator_name", "") or "").lower()
     addr = str(getattr(station, "address", "") or "").lower()
     clean = f"{name} {addr}"
     for phrase in (
@@ -195,6 +203,8 @@ def score_candidate_station(
     has_dir_tag = any(kw in padded for kw in dir_kws)
     is_highway = any(kw in clean for kw in HIGHWAY_KEYWORDS)
     is_overpass = any(kw in clean for kw in ("overpass", "jejantas", "overhead"))
+    is_tesla = is_tesla_station(name, op_name)
+    tesla_affinity = is_tesla_driver and is_tesla
 
     if side == "left":
         score -= 3.0
@@ -204,6 +214,7 @@ def score_candidate_station(
         and not is_overpass
         and side == "right"
         and cross_track_m > 80.0
+        and not tesla_affinity
     ):
         score += 15.0
 
@@ -218,13 +229,17 @@ def score_candidate_station(
         score -= 4.0
     elif "open public bay" in parking or parking == "open bay" or "open" in parking:
         score -= 1.5
-    elif any(
-        k in parking for k in ("multi-storey", "indoor carpark", "basement", "underground")
-    ) or any(m in desc for m in ("mall", "plaza", "klcc", "pavilion", "basement", "underground")):
+    elif (
+        any(k in parking for k in ("multi-storey", "indoor carpark", "basement", "underground"))
+        or any(m in desc for m in ("mall", "plaza", "klcc", "pavilion", "basement", "underground"))
+    ) and not tesla_affinity:
         score += 8.0 if prefer_easy_access else 2.5
 
     if (fee := getattr(station, "parking_fee_myr", None)) and fee > 0.0:
         score += 1.5
+
+    if tesla_affinity:
+        score -= 7.5 if power_kw >= 100.0 else 3.5
 
     return round(score, 4)
 
@@ -272,6 +287,7 @@ def build_corridor_candidates(
     dest_lat: float,
     max_corridor_detour: float,
     prefer_easy_access: bool = False,
+    is_tesla_driver: bool = False,
 ) -> list[CorridorCandidate]:
     """Filter and score stations along route polyline into directional corridor candidates."""
     if not points or not stations:
@@ -299,7 +315,13 @@ def build_corridor_candidates(
         bearing, detour_km, closest_idx = compute_local_segment_bearing(
             polyline, st.latitude, st.longitude
         )
-        if detour_km > max_corridor_detour or is_opposite_highway_direction(
+        is_tesla = is_tesla_station(st.name, getattr(st, "operator_name", "") or "")
+        allowed_detour = (
+            min(max(max_corridor_detour, 12.0), 15.0)
+            if (is_tesla_driver and is_tesla)
+            else max_corridor_detour
+        )
+        if detour_km > allowed_detour or is_opposite_highway_direction(
             st.name, st.address, bearing
         ):
             continue
@@ -308,7 +330,9 @@ def build_corridor_candidates(
         p1, p2 = polyline[p1_idx], polyline[min(p1_idx + 1, len(polyline) - 1)]
         side = compute_cross_track_side(p1, p2, st.latitude, st.longitude)
         cross_track_m = compute_cross_track_distance_m(p1, p2, st.latitude, st.longitude)
-        score = score_candidate_station(st, detour_km, side, cross_track_m, prefer_easy_access)
+        score = score_candidate_station(
+            st, detour_km, side, cross_track_m, prefer_easy_access, is_tesla_driver=is_tesla_driver
+        )
 
         candidates.append(
             CorridorCandidate(
