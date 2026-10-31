@@ -1,4 +1,4 @@
-﻿# Python & Backend
+# Python & Backend
 backend/.venv/
 __pycache__/
 *.py[cod]
@@ -17,6 +17,22 @@ frontend/android/app/build/
 frontend/android/local.properties
 frontend/windows/flutter/ephemeral/
 
-# Local AI CLI config (excluded from public repo)
+# AI CLI, Skills & Agent Development Files (Local Only)
 GEMINI.md
+AGENTS.md
+CLAUDE.md
+SKILL.md
+**/SKILL.md
+.antigravity/
+.antigravityrules
+.antigravityignore
 .gemini/
+.geminiignore
+.agents/
+.claude/
+.cursor/
+.cursorrules
+.windsurfrules
+.aider*
+.copilot/
+
