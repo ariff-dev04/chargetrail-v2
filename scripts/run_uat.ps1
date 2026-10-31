@@ -1,10 +1,10 @@
-<#
+﻿<#
 .SYNOPSIS
     One-Click Live User Acceptance Testing (UAT) Launcher for ChargeTrail v2.
 .DESCRIPTION
     Boots backend server, seeds Malaysian EV stations, configures ADB reverse tunnel, and launches Flutter.
 .PARAMETER Device
-    Target Flutter device (e.g., adb-R5CY10TW9RF-WiUVMM._adb-tls-connect._tcp, chrome, windows).
+    Target Flutter device (e.g., <YOUR_DEVICE_ID>, chrome, windows).
 .PARAMETER ApiUrl
     Optional explicit override for API_BASE_URL.
 #>
@@ -24,7 +24,7 @@ Write-Host ""
 # 1. Resolve ADB Executable Path
 $adbExe = $null
 $possibleAdbPaths = @(
-    "C:\ASSDK\platform-tools\adb.exe",
+    "adb",
     (Join-Path $env:LOCALAPPDATA "Android\Sdk\platform-tools\adb.exe"),
     "adb"
 )
@@ -113,7 +113,7 @@ if (-not $Device) {
             $lines = $deviceListing -split "`r?`n"
             foreach ($line in $lines) {
                 if ($line -match 'emulator' -or $line -match 'android') {
-                    if ($line -match '([a-zA-Z0-9_\-\.:]+)\s+•\s+android') {
+                    if ($line -match '([a-zA-Z0-9_\-\.:]+)\s+â€¢\s+android') {
                         $Device = $matches[1].Trim()
                         break
                     }
@@ -170,3 +170,5 @@ Write-Host ""
 flutter run -d $Device --dart-define=API_BASE_URL=$ApiUrl
 
 Pop-Location
+
+

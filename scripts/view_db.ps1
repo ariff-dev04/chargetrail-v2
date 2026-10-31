@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     ChargeTrail v2 Live Database & OSM Import Inspector.
 .DESCRIPTION
@@ -65,3 +65,5 @@ if ($stations -and $stations.Count -gt 0) {
     Write-Host ""
     Write-Host "Tip: Run `powershell -ExecutionPolicy Bypass -File scripts/run_uat.ps1` to boot live server." -ForegroundColor DarkGray
 }
+
+

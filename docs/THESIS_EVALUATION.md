@@ -1,4 +1,4 @@
-# ChargeTrail v2 — Thesis Evaluation & Architecture Benchmark
+﻿# ChargeTrail v2 â€” Thesis Evaluation & Architecture Benchmark
 
 **Evaluation Date:** October 2026  
 **Project:** ChargeTrail v2 (Academic FYP / Software Engineering Thesis)  
@@ -23,7 +23,7 @@ ChargeTrail v2 represents a complete architectural reconstruction of the legacy 
 | **B-01** | 1-second Firestore polling loops (3,600 reads/user/hour) | Local clock countdown math, zero background polling, async SQLite/PostGIS persistence. | **RESOLVED** |
 | **B-02** | Full collection downloads into mobile memory for spatial queries ($O(N)$) | PostGIS spatial indexing (`ST_DWithin` / GiST) and bounding box queries ($O(\log N)$). | **RESOLVED** |
 | **B-03** | Cascading N+1 queries during feed and saved station hydration | Single SQL query joins with eager relationship loading and indexed foreign keys. | **RESOLVED** |
-| **B-04** | Combinatorial API call explosion in route planner (50–100 calls/trip) | Single OSRM highway polyline call + client-side/server-side corridor stop optimizer. | **RESOLVED** |
+| **B-04** | Combinatorial API call explosion in route planner (50â€“100 calls/trip) | Single OSRM highway polyline call + client-side/server-side corridor stop optimizer. | **RESOLVED** |
 | **C-01** | 154 static analysis warnings, missing dependencies (`uuid`), broken build | 0 lint warnings, 0 static analyzer issues (`flutter analyze` and `ruff check` clean). | **RESOLVED** |
 | **C-02** | Database write side-effects executed inside `Widget.build()` methods | Strict 3-Layer Separation of Concerns (Presentation, Domain, Data) with Riverpod. | **RESOLVED** |
 | **C-03** | Zero automated test coverage (broken default counter test) | 64+ automated unit, widget, and integration tests across backend and frontend. | **RESOLVED** |
@@ -36,14 +36,14 @@ ChargeTrail v2 represents a complete architectural reconstruction of the legacy 
 
 | Dimension | Legacy ChargeTrail v1 | ChargeTrail v2 (Revamped) | Improvement Factor |
 |---|:---:|:---:|:---:|
-| **Monthly Commercial API Cost** | $150 – $400 / month (Google Maps/Directions) | **$0.00 / month** (100% Open-Source) | **Infinitely Sustainable** |
+| **Monthly Commercial API Cost** | $150 â€“ $400 / month (Google Maps/Directions) | **$0.00 / month** (100% Open-Source) | **Infinitely Sustainable** |
 | **Max Source File Line Count** | 3,341 lines (bloated monolith screens) | **336 lines max** (File ceiling < 350) | **10x Modularization** |
 | **Architecture Pattern** | Ad-hoc UI + Direct Firebase writes | **3-Layer Clean Architecture** | **Strict SoC** |
 | **Automated Test Coverage** | 0 tests (0% coverage; broken test suite) | **64 automated tests** (100% pass) | **High Reliability** |
-| **Route Planning Execution Time** | 20 – 45 seconds (50+ nested HTTP calls) | **< 350 milliseconds** (OSRM + corridor) | **~100x Faster** |
+| **Route Planning Execution Time** | 20 â€“ 45 seconds (50+ nested HTTP calls) | **< 350 milliseconds** (OSRM + corridor) | **~100x Faster** |
 | **Spatial Query Complexity** | $O(N)$ full table scan in client memory | **$O(\log N)$** PostGIS GiST index | **Scales to Millions** |
 | **Offline Fault Tolerance** | Total crash / blank screen without internet | **Full Offline Mode** (cache + physics fallback) | **100% Resilient** |
-| **Core Feature Delivery (`KF01–KF16`)** | Partially stubbed / non-functional | **100% Functional & Verified** | **Complete Thesis Scope** |
+| **Core Feature Delivery (`KF01â€“KF16`)** | Partially stubbed / non-functional | **100% Functional & Verified** | **Complete Thesis Scope** |
 
 ---
 
@@ -84,7 +84,9 @@ ChargeTrail v2 provides an open-source, reproducible reference architecture demo
 
 | Benchmark Dimension | Naive Radial Search (Legacy / Typical EV Apps) | ChargeTrail v2 Directional Corridor Scorer |
 |---|---|---|
-| **False Cross-Divider Recommendations** | Frequent (~35–50% on divided expressways) | **0% (Hard-Excluded or +15.0 cross-divider penalty)** |
+| **False Cross-Divider Recommendations** | Frequent (~35â€“50% on divided expressways) | **0% (Hard-Excluded or +15.0 cross-divider penalty)** |
 | **Calculation Determinism** | Nondeterministic (arbitrary DB return ordering) | **100% Deterministic (6-decimal coordinate + ID tie-breaker)** |
-| **Discovery Latency** | 3.5s – 12.0s (repetitive live Overpass sweeps) | **0.2s – 1.0s (Direct IPv4 Nominatim + Photon BBox cache)** |
-| **Commercial API Cost** | $150 – $400 / month (Google Places/Directions) | **$0.00 / month (100% Open-Source & OpenStreetMap)** |
+| **Discovery Latency** | 3.5s â€“ 12.0s (repetitive live Overpass sweeps) | **0.2s â€“ 1.0s (Direct IPv4 Nominatim + Photon BBox cache)** |
+| **Commercial API Cost** | $150 â€“ $400 / month (Google Places/Directions) | **$0.00 / month (100% Open-Source & OpenStreetMap)** |
+
+

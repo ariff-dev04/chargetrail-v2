@@ -1,4 +1,4 @@
-# ChargeTrail: Thesis Engineering Blueprint & Legacy Audit Synthesis
+﻿# ChargeTrail: Thesis Engineering Blueprint & Legacy Audit Synthesis
 
 **Original Thesis Title:** ChargeTrail: Aplikasi Berasaskan Komuniti Pencarian Tempat Pengecasan Kenderaan Elektrik (EV) dan Perancangan Perjalanan  
 **Author:** Muhammad 'Ariff Bin Mohd Zakaria (A193193), Universiti Kebangsaan Malaysia (2025)  
@@ -11,7 +11,7 @@
 ### 1.1 The 4 Core Problems Identified in Thesis (Bab I, Section 1.2)
 1. **Fragmented Charging Ecosystem:** EV drivers in Malaysia must download multiple operator-specific apps (Gentari, JomCharge, chargEV, ChargeSini, etc.) just to check charger availability, plug types, pricing, and status. Data formats across these apps are inconsistent and incomplete.
 2. **"Hidden" & Unlisted Chargers:** Many public-accessible chargers located inside car dealerships, hotels, shopping mall basements, or recreational areas are not registered on public maps (like Google Maps or Waze). Usually, only experienced EV drivers know about them, and their operating hours/access rules change frequently.
-3. **Lack of Guidance for New EV Adopters:** New EV owners struggle to understand their vehicle's real-world range, optimal charging habits, exact parking bay/floor locations, and how to access hidden chargers—knowledge typically held only by seasoned EV drivers.
+3. **Lack of Guidance for New EV Adopters:** New EV owners struggle to understand their vehicle's real-world range, optimal charging habits, exact parking bay/floor locations, and how to access hidden chargersâ€”knowledge typically held only by seasoned EV drivers.
 4. **Inefficient Manual Journey Planning:** Existing local apps lack intelligent, customizable route planning that accounts for specific EV battery capacities, state of charge (SoC), charger speeds, and driver-preferred stop strategies (e.g., quick stops vs. long dining/rest stops).
 
 ### 1.2 Proposed Solution Pillars (Bab I, Section 1.3 & Bab II, Section 2.5)
@@ -280,3 +280,5 @@ flowchart TD
 | **Community Verification Security** | Thesis designs a 5-vote consensus system (`Survei Mikro`) to prevent bad data and reward contributors. | Consensus logic runs on the client (`verify_modal.dart`) with no Firestore rules, allowing any user to spoof votes or overwrite stations directly. | **Server-Enforced Consensus & RBAC:** Handle votes, reputation points, and station mutations strictly on the backend or via locked-down database triggers. |
 | **Offline & Rural Connectivity** | Thesis Section 5.3 notes heavy reliance on stable internet, which fails in rural highway stretches. | Zero local caching; app crashes on startup if `.env` is missing; untyped `Map<String, dynamic>` data causes runtime null errors. | **Offline-First Caching + Strict Typing:** Cache stations and saved trip plans locally (Isar / SQLite / Hive) with strongly typed models (`Freezed` / TypeScript / Pydantic). |
 | **New Features Proposed in Thesis (Section 5.4)** | 1. Official CPO real-time status integration.<br>2. Gamified rewards, badges & active user leaderboard.<br>3. Smart push notifications (low battery / nearby verification prompts).<br>4. Multi-language support (BM, EN, ZH). | Basic level/contribution counters exist, but no push notification service, no i18n localization framework, and broken test suite (154 lint warnings). | **Built-in v2 Modules:** i18n localization from Day 1, push notification hooks (FCM), structured gamification engine, and automated CI/CD linting/testing. |
+
+

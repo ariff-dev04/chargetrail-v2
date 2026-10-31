@@ -1,4 +1,4 @@
-# ChargeTrail – Comprehensive Legacy Codebase Audit & Architectural Review
+﻿# ChargeTrail â€“ Comprehensive Legacy Codebase Audit & Architectural Review
 
 **Audit Date:** October 2026  
 **Target Repository:** `chargetrail-clean-main`  
@@ -11,7 +11,7 @@
 
 **ChargeTrail** is a community-driven Electric Vehicle (EV) charging station discovery, management, and route planning application developed as a Final Year Project (FYP). The application integrates Flutter with Google Firebase (Auth, Firestore, Storage) and Google Maps Platform APIs (Maps SDK, Places API, Directions API).
 
-While the application features an ambitious functional scope—including crowdsourced charger verification, dynamic battery-strategy trip planning, active charging session management, and gamified community contributions—the codebase suffers from severe architectural weaknesses, security vulnerabilities, scalability bottlenecks, and technical debt.
+While the application features an ambitious functional scopeâ€”including crowdsourced charger verification, dynamic battery-strategy trip planning, active charging session management, and gamified community contributionsâ€”the codebase suffers from severe architectural weaknesses, security vulnerabilities, scalability bottlenecks, and technical debt.
 
 This audit provides a comprehensive, code-level analysis of the existing system and delivers a concrete, production-grade roadmap for a **v2 revamp**.
 
@@ -147,53 +147,53 @@ The project adopts a rudimentary feature-first directory layout under `lib/featu
 
 ```
 chargetrail-clean-main/
-├── android/                          # Android native project & Gradle build scripts
-│   ├── app/
-│   │   ├── build.gradle.kts          # Gradle config referencing GOOGLE_MAPS_API_KEY
-│   │   ├── google-services.json      # Committed Firebase configuration & API keys
-│   │   └── src/main/AndroidManifest.xml # Permissions (Location, Internet)
-├── assets/
-│   └── icons/                        # Static UI icons (station, trip, contribute, profile)
-├── ios/                              # iOS native Runner project (Missing configs & keys)
-├── lib/
-│   ├── main.dart                     # App entry point, route table, Firebase initialization
-│   ├── navigation_menu.dart          # Persistent BottomNavigationBar controller
-│   └── features/
-│       ├── adding_charger/screen/    # Add station form (AddChargerScreen)
-│       ├── authentication/
-│       │   ├── screens/              # LoginScreen, SignUpScreen, ForgotPasswordScreen
-│       │   └── services/             # AuthService, UserService
-│       ├── charger_details/
-│       │   ├── firebase/             # FirestoreService (data preloading & upserting)
-│       │   ├── models/               # Charger data model (Charger)
-│       │   ├── screens/              # ChargerDetailScreen (760+ lines)
-│       │   ├── services/             # GooglePlacesService (REST HTTP calls)
-│       │   └── widgets/              # Image carousels, photo rows, review tiles
-│       ├── charging_action/
-│       │   ├── screens/              # Charging, Finish, Could Not Charge, Waiting screens
-│       │   └── widgets/              # PhotoUploader
-│       ├── common/                   # UserUtils helper functions
-│       ├── contribute/
-│       │   ├── controllers/          # ContributeController (spatial filtering & queries)
-│       │   ├── screens/              # ContributeScreen, CommunityFeedScreen
-│       │   ├── services/             # ContributionService, VerificationService
-│       │   └── widgets/              # CommunityAction, UserProfileSummary, VerifyModal
-│       ├── edit_charger/screens/     # EditChargerScreen (520+ lines)
-│       ├── profile/screens/          # ProfileScreen, MyVehicleScreen, SavedStationsScreen, etc.
-│       ├── stations/
-│       │   ├── controllers/          # StationsController (camera animation, GPS helpers)
-│       │   ├── screens/              # StationsScreen (600+ lines, main map controller)
-│       │   ├── services/             # StationsService (Google Places + Firestore merger)
-│       │   └── widgets/              # ChargerCard, SelectedChargerCard, FilterModal, SearchBar
-│       └── trip/
-│           ├── screens/              # TripScreen, TripSummaryScreen
-│           ├── services/
-│           │   ├── logic/            # BatteryStrategy, GeoUtils, RouteAlgorithm (420+ lines)
-│           │   └── trip_service.dart # TripService (Directions API caller)
-│           └── widgets/              # ValueListenableBuilder2 utility
-├── pubspec.yaml                      # Project dependencies & asset declarations
-└── test/
-    └── widget_test.dart              # Unmodified default counter test (broken)
+â”œâ”€â”€ android/                          # Android native project & Gradle build scripts
+â”‚   â”œâ”€â”€ app/
+â”‚   â”‚   â”œâ”€â”€ build.gradle.kts          # Gradle config referencing GOOGLE_MAPS_API_KEY
+â”‚   â”‚   â”œâ”€â”€ google-services.json      # Committed Firebase configuration & API keys
+â”‚   â”‚   â””â”€â”€ src/main/AndroidManifest.xml # Permissions (Location, Internet)
+â”œâ”€â”€ assets/
+â”‚   â””â”€â”€ icons/                        # Static UI icons (station, trip, contribute, profile)
+â”œâ”€â”€ ios/                              # iOS native Runner project (Missing configs & keys)
+â”œâ”€â”€ lib/
+â”‚   â”œâ”€â”€ main.dart                     # App entry point, route table, Firebase initialization
+â”‚   â”œâ”€â”€ navigation_menu.dart          # Persistent BottomNavigationBar controller
+â”‚   â””â”€â”€ features/
+â”‚       â”œâ”€â”€ adding_charger/screen/    # Add station form (AddChargerScreen)
+â”‚       â”œâ”€â”€ authentication/
+â”‚       â”‚   â”œâ”€â”€ screens/              # LoginScreen, SignUpScreen, ForgotPasswordScreen
+â”‚       â”‚   â””â”€â”€ services/             # AuthService, UserService
+â”‚       â”œâ”€â”€ charger_details/
+â”‚       â”‚   â”œâ”€â”€ firebase/             # FirestoreService (data preloading & upserting)
+â”‚       â”‚   â”œâ”€â”€ models/               # Charger data model (Charger)
+â”‚       â”‚   â”œâ”€â”€ screens/              # ChargerDetailScreen (760+ lines)
+â”‚       â”‚   â”œâ”€â”€ services/             # GooglePlacesService (REST HTTP calls)
+â”‚       â”‚   â””â”€â”€ widgets/              # Image carousels, photo rows, review tiles
+â”‚       â”œâ”€â”€ charging_action/
+â”‚       â”‚   â”œâ”€â”€ screens/              # Charging, Finish, Could Not Charge, Waiting screens
+â”‚       â”‚   â””â”€â”€ widgets/              # PhotoUploader
+â”‚       â”œâ”€â”€ common/                   # UserUtils helper functions
+â”‚       â”œâ”€â”€ contribute/
+â”‚       â”‚   â”œâ”€â”€ controllers/          # ContributeController (spatial filtering & queries)
+â”‚       â”‚   â”œâ”€â”€ screens/              # ContributeScreen, CommunityFeedScreen
+â”‚       â”‚   â”œâ”€â”€ services/             # ContributionService, VerificationService
+â”‚       â”‚   â””â”€â”€ widgets/              # CommunityAction, UserProfileSummary, VerifyModal
+â”‚       â”œâ”€â”€ edit_charger/screens/     # EditChargerScreen (520+ lines)
+â”‚       â”œâ”€â”€ profile/screens/          # ProfileScreen, MyVehicleScreen, SavedStationsScreen, etc.
+â”‚       â”œâ”€â”€ stations/
+â”‚       â”‚   â”œâ”€â”€ controllers/          # StationsController (camera animation, GPS helpers)
+â”‚       â”‚   â”œâ”€â”€ screens/              # StationsScreen (600+ lines, main map controller)
+â”‚       â”‚   â”œâ”€â”€ services/             # StationsService (Google Places + Firestore merger)
+â”‚       â”‚   â””â”€â”€ widgets/              # ChargerCard, SelectedChargerCard, FilterModal, SearchBar
+â”‚       â””â”€â”€ trip/
+â”‚           â”œâ”€â”€ screens/              # TripScreen, TripSummaryScreen
+â”‚           â”œâ”€â”€ services/
+â”‚           â”‚   â”œâ”€â”€ logic/            # BatteryStrategy, GeoUtils, RouteAlgorithm (420+ lines)
+â”‚           â”‚   â””â”€â”€ trip_service.dart # TripService (Directions API caller)
+â”‚           â””â”€â”€ widgets/              # ValueListenableBuilder2 utility
+â”œâ”€â”€ pubspec.yaml                      # Project dependencies & asset declarations
+â””â”€â”€ test/
+    â””â”€â”€ widget_test.dart              # Unmodified default counter test (broken)
 ```
 
 ---
@@ -282,7 +282,7 @@ chargetrail-clean-main/
   1. Calls `placesService.fetchNearbyChargers()` in a loop expanding up to 20,000 meters.
   2. For **every charger found**, executes a separate Google Directions API request via `getRoadDistanceKm()` to evaluate road distance.
   3. If 15 candidate chargers are found, 15 individual Directions API requests are executed sequentially.
-- **Impact:** Calculating a single long-distance trip can trigger **50 to 100+ external Google Directions API calls**, resulting in 20–45 second planning times, high API billing rates, and frequent HTTP 429 rate-limiting failures.
+- **Impact:** Calculating a single long-distance trip can trigger **50 to 100+ external Google Directions API calls**, resulting in 20â€“45 second planning times, high API billing rates, and frequent HTTP 429 rate-limiting failures.
 
 ---
 
@@ -412,3 +412,5 @@ The iOS runner configuration cannot run in its current state:
 The legacy ChargeTrail codebase contains a functional prototype with significant domain-specific features tailored to EV drivers. However, its client-centric architecture, high database read patterns, exposed credentials, missing security rules, and lack of test coverage pose severe security and cost risks. 
 
 Following the phased v2 modernization roadmap outlined above will transform ChargeTrail into an enterprise-ready, scalable, and secure production platform.
+
+
