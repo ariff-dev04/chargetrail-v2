@@ -1,4 +1,4 @@
-﻿services:
+services:
   chargetrail_api:
     build: ./backend
     container_name: chargetrail_api
