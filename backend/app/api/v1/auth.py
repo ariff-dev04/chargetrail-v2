@@ -59,6 +59,32 @@ async def login(
     return await service.authenticate_user(payload)
 
 
+@auth_router.get(
+    "/me",
+    response_model=UserProfileRead,
+    summary="Get current user profile and session identity",
+)
+async def get_current_user_profile(
+    current_user: User = Depends(get_current_user),
+    service: AuthService = Depends(get_auth_service),
+) -> UserProfileRead:
+    """Retrieve authenticated user's profile and saved station IDs."""
+    return await service.get_profile(current_user)
+
+
+@auth_router.delete(
+    "/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete user account and personal data (PDPA/GDPR compliance)",
+)
+async def delete_current_user_account(
+    current_user: User = Depends(get_current_user),
+    service: AuthService = Depends(get_auth_service),
+) -> None:
+    """Permanently delete user profile, saved bookmarks, and vehicle profiles."""
+    await service.delete_user_account(current_user)
+
+
 @users_router.get(
     "/me",
     response_model=UserProfileRead,
@@ -70,6 +96,19 @@ async def get_my_profile(
 ) -> UserProfileRead:
     """Retrieve authenticated user's profile and saved station IDs."""
     return await service.get_profile(current_user)
+
+
+@users_router.delete(
+    "/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete current user account and personal data (PDPA/GDPR compliance)",
+)
+async def delete_user_account_users(
+    current_user: User = Depends(get_current_user),
+    service: AuthService = Depends(get_auth_service),
+) -> None:
+    """Permanently delete user profile, saved bookmarks, and vehicle profiles."""
+    await service.delete_user_account(current_user)
 
 
 @users_router.patch(

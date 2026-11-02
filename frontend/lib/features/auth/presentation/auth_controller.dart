@@ -209,8 +209,27 @@ class AuthNotifier extends Notifier<AuthState> {
     await repo.clearSession();
     state = const AuthState();
   }
+
+  /// 1-Tap recruiter and demo driver authentication shortcut.
+  Future<void> loginDemoDriver() => loginAsDemoDriver();
+
+  /// Permanently delete user account and clear all local/remote session data (PDPA/GDPR).
+  Future<void> deleteAccount() async {
+    final token = state.token;
+    final repo = ref.read(authRepositoryProvider);
+    if (token != null) {
+      await repo.deleteAccount(token);
+    } else {
+      await repo.clearSession();
+    }
+    state = const AuthState();
+  }
 }
 
 /// Global provider for AuthController.
 final authControllerProvider =
     NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+
+/// Standard alias for authControllerProvider.
+final authProvider = authControllerProvider;
+

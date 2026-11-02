@@ -61,7 +61,7 @@ class AuthRepository {
     } catch (_) {}
   }
 
-  /// Register new user account with API or generate local demo session.
+  /// Register new user account with API.
   Future<({UserProfile user, String token})> register({
     required String email,
     required String password,
@@ -81,33 +81,54 @@ class AuthRepository {
         },
       );
 
-      if (response.statusCode == 201 && response.data is Map<String, dynamic>) {
-        final data = response.data as Map<String, dynamic>;
+      if (response.statusCode == 201 && response.data is Map) {
+        final data = response.data as Map;
         final token = data['access_token'] as String;
-        final user = UserProfile.fromJson(data['user'] as Map<String, dynamic>);
+        final userMap = Map<String, dynamic>.from(data['user'] as Map);
+        final user = UserProfile.fromJson(userMap);
         await saveSession(user, token);
         return (user: user, token: token);
       }
-    } catch (e) {
-      if (e is DioException && e.response?.statusCode == 409) {
+      throw Exception(
+        'Unable to reach authentication server. Please check connection or use Instant Demo Account.',
+      );
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      if (statusCode == 409) {
         throw Exception('An account with this email already exists.');
       }
+      if (statusCode == 422) {
+        final rawData = e.response?.data;
+        if (rawData is Map) {
+          final detail = rawData['detail'];
+          if (detail is String && detail.trim().isNotEmpty) {
+            throw Exception(detail.trim());
+          }
+          if (detail is List && detail.isNotEmpty) {
+            final first = detail.first;
+            if (first is Map &&
+                first['msg'] != null &&
+                first['msg'].toString().trim().isNotEmpty) {
+              throw Exception(first['msg'].toString().trim());
+            }
+          }
+        }
+        throw Exception(
+          'Please enter a valid email and a password of at least 6 characters.',
+        );
+      }
+      throw Exception(
+        'Unable to reach authentication server. Please check connection or use Instant Demo Account.',
+      );
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception(
+        'Unable to reach authentication server. Please check connection or use Instant Demo Account.',
+      );
     }
-
-    // Offline / Demo Account Fallback
-    final fallbackUser = UserProfile(
-      id: 'local-demo-${DateTime.now().millisecondsSinceEpoch}',
-      email: email,
-      fullName: fullName,
-      phoneNumber: phoneNumber,
-      preferredConnector: preferredConnector,
-    );
-    const fallbackToken = 'local-offline-demo-token';
-    await saveSession(fallbackUser, fallbackToken);
-    return (user: fallbackUser, token: fallbackToken);
   }
 
-  /// Log into existing user account with API or activate local demo session.
+  /// Log into existing user account with API.
   Future<({UserProfile user, String token})> login({
     required String email,
     required String password,
@@ -121,29 +142,34 @@ class AuthRepository {
         },
       );
 
-      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
-        final data = response.data as Map<String, dynamic>;
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map;
         final token = data['access_token'] as String;
-        final user = UserProfile.fromJson(data['user'] as Map<String, dynamic>);
+        final userMap = Map<String, dynamic>.from(data['user'] as Map);
+        final user = UserProfile.fromJson(userMap);
         await saveSession(user, token);
         return (user: user, token: token);
       }
-    } catch (e) {
-      if (e is DioException && e.response?.statusCode == 401) {
+      throw Exception(
+        'Unable to reach authentication server. Please check connection or use Instant Demo Account.',
+      );
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      if (statusCode == 401 || statusCode == 404) {
         throw Exception('Invalid email or password credentials.');
       }
+      if (statusCode == 422) {
+        throw Exception('Please enter a valid email address and password.');
+      }
+      throw Exception(
+        'Unable to reach authentication server. Please check connection or use Instant Demo Account.',
+      );
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception(
+        'Unable to reach authentication server. Please check connection or use Instant Demo Account.',
+      );
     }
-
-    // Offline / Demo Fallback
-    final demoUser = UserProfile(
-      id: 'demo-driver-001',
-      email: email,
-      fullName: 'Malaysian EV Driver',
-      preferredConnector: 'CCS2',
-    );
-    const demoToken = 'local-offline-demo-token';
-    await saveSession(demoUser, demoToken);
-    return (user: demoUser, token: demoToken);
   }
 
   /// Update user profile details.
@@ -219,5 +245,21 @@ class AuthRepository {
     final updatedUser = currentUser.copyWith(savedStationIds: currentIds);
     await saveSession(updatedUser, token);
     return (isSaved: isSaved, savedIds: currentIds);
+  }
+
+  /// Permanently delete user account and clear session (PDPA/GDPR compliance).
+  Future<void> deleteAccount(String token) async {
+    try {
+      if (!token.contains('local-offline-demo-token') && !token.contains('demo')) {
+        await _dio.delete(
+          '/api/v1/auth/me',
+          options: Options(headers: {'Authorization': 'Bearer $token'}),
+        );
+      }
+    } catch (_) {
+      // Graceful local fallback if offline or request fails
+    } finally {
+      await clearSession();
+    }
   }
 }

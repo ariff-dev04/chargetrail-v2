@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/presentation/profile_screen.dart';
-import 'features/routing/presentation/route_planner_screen.dart';
-import 'features/stations/presentation/map_discovery_screen.dart';
-import 'features/vehicles/presentation/garage_screen.dart';
+import 'presentation/screens/app_shell_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,66 +24,8 @@ class ChargeTrailApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      home: const AppShell(),
+      home: const AppShellScreen(),
     );
   }
 }
 
-/// Navigation shell hosting the primary Map Discovery and modular feature tabs.
-class AppShell extends StatefulWidget {
-  const AppShell({super.key});
-
-  @override
-  State<AppShell> createState() => _AppShellState();
-}
-
-class _AppShellState extends State<AppShell> {
-  int _currentIndex = 0;
-
-  final List<Widget> _pages = const [
-    MapDiscoveryScreen(),
-    RoutePlannerScreen(),
-    GarageScreen(),
-    ProfileScreen(),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore),
-            label: 'Explore',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.alt_route_outlined),
-            selectedIcon: Icon(Icons.alt_route),
-            label: 'Route Planner',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.electric_car_outlined),
-            selectedIcon: Icon(Icons.electric_car),
-            label: 'EV Garage',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile & Saved',
-          ),
-        ],
-      ),
-    );
-  }
-}

@@ -214,11 +214,51 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         const SizedBox(height: 18),
         OutlinedButton.icon(
           onPressed: () => notifier.logout(),
-          icon: const Icon(Icons.logout, color: Colors.red),
-          label: const Text('Log Out', style: TextStyle(color: Colors.red)),
+          icon: const Icon(Icons.logout_rounded, color: Colors.grey),
+          label: const Text('Log Out', style: TextStyle(color: Colors.grey)),
+          style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.grey), padding: const EdgeInsets.symmetric(vertical: 10)),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: () => _confirmAccountDeletion(context),
+          icon: const Icon(Icons.delete_forever_rounded, color: Colors.red),
+          label: const Text('Delete Account & Data', style: TextStyle(color: Colors.red)),
           style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.redAccent), padding: const EdgeInsets.symmetric(vertical: 10)),
         ),
       ],
     );
+  }
+
+  Future<void> _confirmAccountDeletion(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Expanded(child: Text('Delete Account & Personal Data?')),
+          ],
+        ),
+        content: const Text(
+          'This action permanently purges your driver profile, vehicle specifications, and saved station bookmarks in compliance with PDPA/GDPR regulations. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await ref.read(authProvider.notifier).deleteAccount();
+    }
   }
 }

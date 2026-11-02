@@ -159,3 +159,34 @@ async def test_station_bookmark_toggle_and_listing(async_client: AsyncClient) ->
         headers=headers,
     )
     assert not_found_res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_user_account_and_data_deletion(async_client: AsyncClient) -> None:
+    """Verify DELETE /api/v1/auth/me deletes user and cascades bookmarks/vehicles."""
+    user_payload = {
+        "email": "delete.me@chargetrail.com",
+        "password": "Password123!",
+        "full_name": "Farewell User",
+        "preferred_connector": "CCS2",
+    }
+    reg_res = await async_client.post("/api/v1/auth/register", json=user_payload)
+    assert reg_res.status_code == 201
+    token = reg_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    me_res = await async_client.get("/api/v1/auth/me", headers=headers)
+    assert me_res.status_code == 200
+    assert me_res.json()["email"] == "delete.me@chargetrail.com"
+
+    del_res = await async_client.delete("/api/v1/auth/me", headers=headers)
+    assert del_res.status_code == 204
+
+    post_del_res = await async_client.get("/api/v1/auth/me", headers=headers)
+    assert post_del_res.status_code in (401, 404)
+
+    login_res = await async_client.post(
+        "/api/v1/auth/login",
+        json={"email": "delete.me@chargetrail.com", "password": "Password123!"},
+    )
+    assert login_res.status_code == 401

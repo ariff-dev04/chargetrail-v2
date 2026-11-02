@@ -3,9 +3,11 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import delete
 
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models.user import User
+from app.models.user import SavedStation, User
+from app.models.vehicle import VehicleProfile
 from app.repositories.station_repository import StationRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.station import StationRead
@@ -129,3 +131,11 @@ class AuthService:
         """Fetch full station entities saved by the user."""
         stations = await self.user_repo.get_saved_stations(user.id)
         return [StationService._entity_to_dto(s) for s in stations]
+
+    async def delete_user_account(self, user: User) -> None:
+        """Permanently delete user account and associated personal records (PDPA/GDPR compliance)."""
+        session = self.user_repo.session
+        await session.execute(delete(SavedStation).where(SavedStation.user_id == user.id))
+        await session.execute(delete(VehicleProfile).where(VehicleProfile.user_id == user.id))
+        await session.delete(user)
+        await session.commit()
