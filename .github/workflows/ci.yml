@@ -97,5 +97,4 @@ jobs:
           cd /home/arifflabs/chargetrail-v2
           chmod -R a+rX /home/arifflabs/chargetrail-v2/frontend/build/web
           docker compose up -d --build
-          sleep 3
-          curl -f -s http://127.0.0.1:8086/health
+          curl --retry 10 --retry-delay 2 --retry-all-errors -f -s http://127.0.0.1:8086/health
